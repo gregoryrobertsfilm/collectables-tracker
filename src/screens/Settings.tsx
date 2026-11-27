@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useAuth } from '../auth/auth-context'
 import { friendlyAuthError } from '../auth/messages'
 import { Button, Card, Notice } from '../components/ui'
@@ -51,6 +52,22 @@ export function Settings() {
           “Sign out everywhere” is for a lost phone. Other devices are signed out within the hour. Then set a new
           password with “Forgot password?” on the sign-in screen.
         </p>
+      </Card>
+
+      <Card>
+        <h2 className="font-semibold">Your data</h2>
+        <ul className="mt-2 divide-y divide-line">
+          <li>
+            <Link to="/import" className="flex min-h-12 items-center justify-between font-medium text-accent">
+              Import a spreadsheet <span aria-hidden="true">›</span>
+            </Link>
+          </li>
+          <li>
+            <Link to="/check" className="flex min-h-12 items-center justify-between font-medium text-accent">
+              Starting data check <span aria-hidden="true">›</span>
+            </Link>
+          </li>
+        </ul>
       </Card>
 
       <p className="text-center text-sm text-ink-3">

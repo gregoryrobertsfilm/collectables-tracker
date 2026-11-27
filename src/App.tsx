@@ -6,7 +6,9 @@ import { AppShell } from './components/AppShell'
 import { Button, FullScreenMessage, Logo, Notice, Spinner } from './components/ui'
 import { UpdateBanner, UpdateProvider } from './components/update'
 import { configProblem } from './lib/supabase'
+import { DataCheck } from './screens/DataCheck'
 import { Home } from './screens/Home'
+import { Import } from './screens/Import'
 import { Login } from './screens/Login'
 import { NotConnected } from './screens/NotConnected'
 import { SetNewPassword } from './screens/SetNewPassword'
@@ -46,6 +48,8 @@ function AuthGate() {
           <Route element={<AppShell />}>
             <Route index element={<Home />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="import" element={<Import />} />
+            <Route path="check" element={<DataCheck />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
