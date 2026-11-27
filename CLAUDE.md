@@ -160,10 +160,10 @@ Facts below were read from the official docs on 2026-11-26 and fact-checked. Das
 Tick each line as it is done and record the date. Greg does every sign-up, password and verification code himself.
 
 **GitHub** (free; unlimited private repositories)
-- [ ] Greg creates the account at github.com/signup and verifies his email.
-- [ ] Greg creates a **private** repository named `collectables-tracker` at github.com/new (no README, no .gitignore, no license).
-- [ ] With Greg's OK, Claude creates an SSH key on this Mac for this one repository; Greg pastes the **public** half at repository → Settings → Deploy keys → Add deploy key, with "Allow write access" ticked. (Chosen over installing the GitHub command-line tool: no download, and the key can reach only this one repository. Trade-off: anything else on GitHub, such as adding a secret, Greg does in the browser.)
-- [ ] Set this repository's git email to Greg's GitHub no-reply address (shown at github.com/settings/emails; format `ID+username@users.noreply.github.com`). It is currently a placeholder, `greg@collectables-tracker.invalid`. Then push.
+- [x] Greg creates the account at github.com/signup and verifies his email. (2026-11-26; username `gregoryrobertsfilm`)
+- [x] Greg creates a **private** repository named `collectables-tracker` at github.com/new (no README, no .gitignore, no license). (2026-11-26)
+- [ ] Claude creates an SSH key on this Mac for this one repository (done 2026-11-26: `~/.ssh/collectables_tracker_deploy`; this repository's git is set to use only that key); Greg pastes the **public** half at repository → Settings → Deploy keys → Add deploy key, with "Allow write access" ticked (**waiting on Greg**). (Chosen over installing the GitHub command-line tool: no download, and the key can reach only this one repository. Trade-off: anything else on GitHub, such as adding a secret, Greg does in the browser.)
+- [ ] Set this repository's git email to Greg's GitHub no-reply address (done 2026-11-26: `361811936+gregoryrobertsfilm@users.noreply.github.com`). Then push to `git@github.com:gregoryrobertsfilm/collectables-tracker.git` (**not pushed yet**).
 - [ ] Recommended: Greg turns on two-factor authentication (Settings → Password and authentication) and saves the recovery codes.
 
 **Supabase** (free: 500 MB database, 1 GB files, no automatic backups, pauses after about a week without use)
