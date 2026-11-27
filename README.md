@@ -6,7 +6,7 @@ This page is written for you, Greg, not for a programmer. You never need to edit
 
 ## Status today
 
-**Stage 2 nearly done.** The app is online at **https://collectables-tracker.collectables-tracker.workers.dev** and only you can sign in. It holds **no data yet**; your figures are loaded in stage 3.
+**Stage 2 done.** The app is online at **https://collectables-tracker.collectables-tracker.workers.dev** and only you can sign in. It holds **no data yet**; your figures are loaded in stage 3.
 
 ## Where things live
 
