@@ -51,8 +51,7 @@ create table public.brands (
   owner_id uuid not null default auth.uid() references auth.users (id) on delete restrict,
   name text not null check (length(btrim(name)) > 0),
   sort_order integer not null default 0,
-  created_at timestamptz not null default now(),
-  unique (owner_id, name)
+  created_at timestamptz not null default now()
 );
 
 -- Where a physical copy is kept: "Bag 01" ... "Bag 06" today.
@@ -61,8 +60,7 @@ create table public.storage_locations (
   owner_id uuid not null default auth.uid() references auth.users (id) on delete restrict,
   name text not null check (length(btrim(name)) > 0),
   sort_order integer not null default 0,
-  created_at timestamptz not null default now(),
-  unique (owner_id, name)
+  created_at timestamptz not null default now()
 );
 
 -- Selling sites: eBay and Vinted today. Fee presets are added in stage 6.
@@ -71,9 +69,13 @@ create table public.platforms (
   owner_id uuid not null default auth.uid() references auth.users (id) on delete restrict,
   name text not null check (length(btrim(name)) > 0),
   sort_order integer not null default 0,
-  created_at timestamptz not null default now(),
-  unique (owner_id, name)
+  created_at timestamptz not null default now()
 );
+
+-- One name, one entry, whatever the capitals: "eBay" and "Ebay" are the same platform.
+create unique index brands_owner_name_key on public.brands (owner_id, lower(name));
+create unique index storage_locations_owner_name_key on public.storage_locations (owner_id, lower(name));
+create unique index platforms_owner_name_key on public.platforms (owner_id, lower(name));
 
 -- ---------------------------------------------------------------------------
 -- Catalogue: release -> figure -> copy
@@ -148,7 +150,8 @@ create table public.copies (
   updated_at timestamptz not null default now(),
   unique (owner_id, code),
   -- A copy's figure must belong to the copy's own release.
-  foreign key (figure_id, release_id) references public.figures (id, release_id) on delete restrict
+  -- ON UPDATE CASCADE: if a figure is moved to another release, its copies move with it.
+  foreign key (figure_id, release_id) references public.figures (id, release_id) on update cascade on delete restrict
 );
 
 create index copies_figure_id_idx on public.copies (figure_id);
@@ -294,7 +297,9 @@ begin
       'using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id)',
       t || '_owner_only', t
     );
-    execute format('revoke all on table public.%I from public, anon', t);
+    -- Start from nothing, then give the signed-in role only the four everyday rights.
+    -- (Supabase's defaults would otherwise leave it TRUNCATE, which ignores row security.)
+    execute format('revoke all on table public.%I from public, anon, authenticated', t);
     execute format('grant select, insert, update, delete on table public.%I to authenticated', t);
   end loop;
 end;

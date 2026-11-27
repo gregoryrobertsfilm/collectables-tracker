@@ -68,6 +68,24 @@ export function parseWorkbook(sheets: Record<string, SheetRows>, options: Option
   const salesTab = openTab(sheets, 'Sales', problems, false)
   if (!releasesTab || !figuresTab || !copiesTab) return { ok: false, problems }
 
+  // A tab with a near-miss name would otherwise be skipped without a word.
+  const knownTabs = ['releases', 'figures', 'copies', 'listings', 'sales', 'read me']
+  for (const tabName of Object.keys(sheets)) {
+    const lower = tabName.trim().toLowerCase()
+    if (knownTabs.includes(lower)) continue
+    if (/listing|sale/.test(lower)) {
+      problems.push({
+        tab: tabName,
+        row: null,
+        message: `The tab "${tabName}" looks like listings or sales but is not named exactly "Listings" or "Sales". Rename it, or delete it if it is not needed.`,
+      })
+    } else {
+      notes.push(`The tab "${tabName}" was not recognised and was ignored.`)
+    }
+  }
+  if (!listingsTab) notes.push('No "Listings" tab was found: no listings will be imported.')
+  if (!salesTab) notes.push('No "Sales" tab was found: no sales will be imported.')
+
   // ---- Releases -----------------------------------------------------------
   const releases: ImportRelease[] = []
   const releaseCodes = new Set<string>()
@@ -92,12 +110,14 @@ export function parseWorkbook(sheets: Record<string, SheetRows>, options: Option
       const name = text(row[c.name])
       if (!name) return t.problem(n, `Release ${code} has no name.`)
       releaseCodes.add(code)
+      const edition = wholeNumber(row[c.edition], (m) => t.problem(n, `Release ${code}: Edition size ${m}`))
+      if (edition === 0) t.problem(n, `Release ${code}: Edition size must be 1 or more, or left blank if it is not known.`)
       releases.push({
         brand: (c.brand >= 0 ? text(row[c.brand]) : null) ?? brand,
         code,
         name,
         license: at(row, c.license),
-        edition_size: wholeNumber(row[c.edition], (m) => t.problem(n, `Edition size ${m}`)),
+        edition_size: edition,
         exclusive: at(row, c.exclusive),
         barcode: at(row, c.barcode),
         box_number: at(row, c.box),
@@ -386,10 +406,18 @@ export function parseWorkbook(sheets: Record<string, SheetRows>, options: Option
         return t.problem(n, `Sale ${code}: amounts cannot be negative.`)
       }
       const soldOn = dateCell(row[c.sold], (m) => t.problem(n, `Sale ${code}: Date sold ${m}`))
+      // The sale came from a listing in this file when exactly one listing on the same
+      // platform carries the same listing number (a multi-quantity listing that has partly sold).
+      const externalId = at(row, c.external)
+      const fromListings =
+        externalId === null
+          ? []
+          : listings.filter((l) => l.platform.toLowerCase() === platform.toLowerCase() && l.external_id === externalId)
       seen.add(code)
       sales.push({
         code,
         platform,
+        listing_code: fromListings.length === 1 ? fromListings[0].code : null,
         sold_on: soldOn,
         sale_price_cents: price,
         shipping_charged_cents: shipping,
@@ -398,7 +426,7 @@ export function parseWorkbook(sheets: Record<string, SheetRows>, options: Option
         other_cost_cents: null,
         buyer: at(row, c.buyer),
         order_number: at(row, c.order),
-        external_id: at(row, c.external),
+        external_id: externalId,
         status: 'complete',
         note: at(row, c.note),
         needs_review: platform.toLowerCase() === 'vinted',
@@ -429,6 +457,26 @@ export function parseWorkbook(sheets: Record<string, SheetRows>, options: Option
       }
     })
   }
+
+  // One name, one spelling: "Ebay" and "eBay" would otherwise look like two platforms.
+  const clash = (tab: string, what: string, values: Array<string | null>) => {
+    const groups = new Map<string, Map<string, number>>()
+    for (const value of values) {
+      if (value === null) continue
+      const group = groups.get(value.toLowerCase()) ?? new Map<string, number>()
+      group.set(value, (group.get(value) ?? 0) + 1)
+      groups.set(value.toLowerCase(), group)
+    }
+    for (const group of groups.values()) {
+      if (group.size < 2) continue
+      const list = [...group].map(([spelling, count]) => `"${spelling}" (${count} ${count === 1 ? 'time' : 'times'})`).join(' and ')
+      problems.push({ tab, row: null, message: `One ${what} is written more than one way: ${list}. Make them the same.` })
+    }
+  }
+  clash('Releases', 'brand', releases.map((r) => r.brand))
+  clash('Figures', 'variant', figures.map((f) => f.variant))
+  clash('Copies', 'storage location', copies.map((c) => c.storage))
+  clash('Listings and Sales', 'platform', [...listings.map((l) => l.platform), ...sales.map((s) => s.platform)])
 
   if (problems.length > 0) return { ok: false, problems }
 
@@ -481,17 +529,27 @@ function openTab(sheets: Record<string, SheetRows>, name: string, problems: Impo
     if (required) problems.push({ tab: name, row: null, message: `The spreadsheet has no "${name}" tab.` })
     return null
   }
-  const headers = rows[0].map((h) => (typeof h === 'string' ? h.trim() : ''))
+  // Calculated columns are Greg's own checking formulas. They are never read, whatever they are called.
+  const headers = rows[0].map((h) => {
+    const heading = typeof h === 'string' ? h.trim().toLowerCase() : ''
+    return heading.endsWith('(calculated)') ? '' : heading
+  })
   const find = (...names: string[]) => {
     for (const wanted of names) {
       const lower = wanted.toLowerCase()
-      const index = headers.findIndex((h) => {
-        const heading = h.toLowerCase()
-        // Calculated columns are Greg's own checking formulas. Never read them.
-        if (heading.endsWith('(calculated)')) return false
-        return heading === lower || heading.startsWith(lower)
-      })
-      if (index >= 0) return index
+      // An exact heading always wins over one that merely starts with the same words.
+      const exact = headers.indexOf(lower)
+      if (exact >= 0) return exact
+      const starts = headers.flatMap((heading, index) => (heading !== '' && heading.startsWith(lower) ? [index] : []))
+      if (starts.length === 1) return starts[0]
+      if (starts.length > 1) {
+        problems.push({
+          tab: name,
+          row: 1,
+          message: `The "${name}" tab has ${starts.length} columns starting with "${wanted}", so it is not clear which one to read. Rename one of them.`,
+        })
+        return starts[0]
+      }
     }
     return -1
   }

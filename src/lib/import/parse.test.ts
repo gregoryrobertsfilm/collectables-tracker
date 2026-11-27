@@ -74,13 +74,34 @@ describe('parseWorkbook: a valid spreadsheet', () => {
     expect(data.brands).toEqual([{ name: 'Thrilljoy PIX!' }])
   })
 
-  it('never reads a "(calculated)" column, even when its name matches', () => {
-    // "Total copies (calculated)" and "Net earnings (calculated)" hold junk values above.
+  it('never reads a "(calculated)" column, even when it comes first and its name matches', () => {
+    // Look-alike calculated columns placed BEFORE the real ones, holding wrong values.
     const data = okData((wb) => {
-      wb.Figures[0].push('Variant (calculated)')
-      wb.Figures[1].push('Rare Chase')
+      wb.Figures.forEach((row, i) => row.unshift(i === 0 ? 'Variant (calculated)' : 'Rare Chase'))
+      wb.Sales.forEach((row, i) => row.unshift(i === 0 ? 'Sale price (Calculated) ' : 1))
+      wb.Copies.forEach((row, i) => row.unshift(i === 0 ? 'Cost paid (calculated)' : 99))
     })
-    expect(data.figures[0].variant).toBe('Hero')
+    expect(data.figures.map((f) => f.variant)).toEqual(['Hero', 'Chase', 'Hero'])
+    expect(data.sales.map((s) => s.sale_price_cents)).toEqual([3398, 4500])
+    expect(data.copies.filter((c) => c.status === 'in_hand').map((c) => c.cost_cents)).toEqual([null, 1250, null, null, 0])
+  })
+
+  it('prefers a heading that matches exactly over an earlier one that only starts the same way', () => {
+    const data = okData((wb) => {
+      wb.Copies.forEach((row, i) => row.unshift(i === 0 ? 'Box number' : 'ZZZ'))
+      wb.Listings.forEach((row, i) => row.unshift(i === 0 ? 'Notes for me' : 'private'))
+    })
+    expect(data.copies[0].boxed).toBe(true)
+    expect(data.listings[0].note).toBeNull()
+  })
+
+  it('links a sale to the listing it came from when the listing number matches exactly one listing', () => {
+    const data = okData((wb) => {
+      set(wb, 'Sales', 1, 'eBay item ID', '111')
+    })
+    expect(data.sales.map((s) => s.listing_code)).toEqual(['L-1', null])
+    // Same number on a different platform is not a match.
+    expect(okData((wb) => set(wb, 'Sales', 2, 'eBay item ID', '111')).sales.map((s) => s.listing_code)).toEqual([null, null])
   })
 
   it('maps owners, box, yes/no and blanks', () => {
@@ -149,14 +170,21 @@ describe('parseWorkbook: a valid spreadsheet', () => {
     ])
   })
 
-  it('works without Listings and Sales tabs (a plain inventory file)', () => {
-    const data = okData((wb) => {
+  it('works without Listings and Sales tabs (a plain inventory file), and says so', () => {
+    const result = parsed((wb) => {
       delete wb.Listings
       delete wb.Sales
+      wb['My scribbles'] = [['anything']]
     })
-    expect(data.listings).toEqual([])
-    expect(data.sales).toEqual([])
-    expect(data.copies).toHaveLength(5)
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.data.listings).toEqual([])
+    expect(result.data.sales).toEqual([])
+    expect(result.data.copies).toHaveLength(5)
+    expect(result.notes).toEqual([
+      'The tab "My scribbles" was not recognised and was ignored.',
+      'No "Listings" tab was found: no listings will be imported.',
+      'No "Sales" tab was found: no sales will be imported.',
+    ])
   })
 
   it('skips completely blank rows', () => {
@@ -216,6 +244,37 @@ describe('parseWorkbook: problems are reported and nothing is returned', () => {
     expect(problemsOf((wb) => set(wb, 'Listings', 1, 'Listing type', 'Hero + Chase set')).join(' ')).toMatch(/does not match the number of figures/)
     expect(problemsOf((wb) => set(wb, 'Listings', 2, 'Figure ID 2', 'F-1')).join(' ')).toMatch(/same figure twice/)
     expect(problemsOf((wb) => set(wb, 'Listings', 1, 'Date listed', 'last week')).join(' ')).toMatch(/should be a date/)
+  })
+
+  it('two columns that start with the same wanted words', () => {
+    const problems = problemsOf((wb) => {
+      wb.Copies[0][wb.Copies[0].indexOf('Where this row came from')] = 'Where this row came from (old)'
+      wb.Copies.forEach((row, i) => row.push(i === 0 ? 'Where this row came from (new)' : 'x'))
+    })
+    expect(problems.join(' ')).toMatch(/2 columns starting with "Where this row came from"/)
+  })
+
+  it('a tab whose name is nearly "Listings" or "Sales"', () => {
+    const problems = problemsOf((wb) => {
+      wb['Listings (live)'] = wb.Listings
+      delete wb.Listings
+    })
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toMatch(/looks like listings or sales/)
+  })
+
+  it('an edition size of zero, without also blaming the figures and copies of that release', () => {
+    const problems = problemsOf((wb) => set(wb, 'Releases', 1, 'Edition size', 0))
+    expect(problems).toEqual(['Releases row 2: Release R-1: Edition size must be 1 or more, or left blank if it is not known.'])
+  })
+
+  it('one name written with different capitals (platform, storage location, variant)', () => {
+    expect(problemsOf((wb) => set(wb, 'Sales', 1, 'Platform', 'Ebay')).join(' ')).toMatch(/One platform is written more than one way: "eBay" \(1 time\) and "Ebay" \(1 time\)/)
+    expect(problemsOf((wb) => set(wb, 'Copies', 4, 'Storage location', 'bag 02')).join(' ')).toMatch(/One storage location is written more than one way/)
+    expect(problemsOf((wb) => {
+      set(wb, 'Figures', 3, 'Variant', 'hero')
+      set(wb, 'Copies', 5, 'Variant', 'hero')
+    }).join(' ')).toMatch(/One variant is written more than one way/)
   })
 
   it('reports every problem at once, with tab and row, so they can all be fixed in one go', () => {

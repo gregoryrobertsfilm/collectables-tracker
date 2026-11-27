@@ -49,6 +49,28 @@ describe('reserveForSaleCopies: how many for-sale copies are still to be listed'
     expect(result).toEqual({ notListed: 0, overListed: ['F1', 'F2'] })
   })
 
+  it('never picks a flawed copy automatically', () => {
+    // Two copies, one flawed, one listing for 1: the sound copy is listed, the flawed one is not.
+    expect(reserveForSaleCopies([copy('a', 'F1'), copy('b', 'F1', { flaw: true })], [listing('L1', ['F1'], 1)])).toEqual({
+      notListed: 1,
+      overListed: [],
+    })
+    // Only a flawed copy exists: the listing cannot be met from sound copies, so it is flagged.
+    expect(reserveForSaleCopies([copy('b', 'F1', { flaw: true })], [listing('L1', ['F1'], 1)])).toEqual({
+      notListed: 1,
+      overListed: ['F1'],
+    })
+  })
+
+  it('counts a flawed copy as listed when it is attached to the listing by hand', () => {
+    const copies = [copy('a', 'F1'), copy('b', 'F1', { flaw: true })]
+    expect(reserveForSaleCopies(copies, [listing('L1', ['F1'], 1, { copyIds: ['b'] })])).toEqual({ notListed: 1, overListed: [] })
+    // ...and a second listing then takes the sound copy.
+    expect(
+      reserveForSaleCopies(copies, [listing('L1', ['F1'], 1, { copyIds: ['b'] }), listing('L2', ['F1'], 1, { platform: 'Vinted' })]),
+    ).toEqual({ notListed: 0, overListed: [] })
+  })
+
   it('ignores an attached copy that is not a for-sale copy of that figure', () => {
     const copies = [copy('a', 'F1'), copy('b', 'F1')]
     expect(reserveForSaleCopies(copies, [listing('L1', ['F1'], 1, { copyIds: ['zzz'] })]).notListed).toBe(1)
@@ -110,10 +132,12 @@ describe('computeStats', () => {
     expect(stats.listedUnits).toBe(4)
   })
 
-  it('works out the to-list pile', () => {
-    // F1: 3 for-sale copies, 2 + 1 listed -> 0 left. F2: 1 copy, 1 listed -> 0. Sealed: 1.
-    expect(stats.forSaleNotListed).toBe(1)
-    expect(stats.overListedFigureIds).toEqual([])
+  it('works out the to-list pile, never counting a flawed copy as listed automatically', () => {
+    // F1: 3 for-sale copies, one flawed. Listings want 2 + 1 = 3, but only 2 sound copies exist,
+    // so the flawed one stays in the to-list pile and F1 is flagged as over-listed.
+    // F2: 1 copy, 1 listed -> 0. Sealed: 1.
+    expect(stats.forSaleNotListed).toBe(2)
+    expect(stats.overListedFigureIds).toEqual(['F1'])
   })
 
   it('leaves refunded sales out of the count and the net', () => {

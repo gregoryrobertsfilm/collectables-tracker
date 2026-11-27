@@ -25,10 +25,21 @@ describe('friendlyDataError: database errors in plain language', () => {
     expect(friendlyDataError({ message: 'TypeError: Failed to fetch' })).toMatch(/internet connection/)
     expect(friendlyDataError({ code: 'PGRST301', message: 'JWT expired' })).toMatch(/sign-in has expired/)
   })
+  it('says that retrying will not help when the database refuses a value', () => {
+    expect(friendlyDataError({ code: '23514', message: 'violates check constraint "releases_edition_size_check"' })).toMatch(
+      /Trying again will not help.*code 23514/,
+    )
+    expect(friendlyDataError({ code: '22003', message: 'integer out of range' })).toMatch(/code 22003/)
+  })
+  it('does not claim "nothing was changed" when the outcome is unknown', () => {
+    const message = friendlyDataError({ message: '<html>502 Bad Gateway</html>' })
+    expect(message).toMatch(/could not confirm the result/)
+    expect(message).not.toMatch(/Nothing was changed/)
+    expect(friendlyDataError(null)).toMatch(/could not confirm/)
+  })
   it('never shows raw technical text for anything else', () => {
     expect(friendlyDataError({ code: 'XX000', message: 'internal error at line 42' })).toBe(
       'Something went wrong talking to the database. Nothing was changed. Please try again.',
     )
-    expect(friendlyDataError(null)).toMatch(/Something went wrong/)
   })
 })

@@ -64,7 +64,7 @@ function Results({ rows, onRecount }: { rows: ReturnType<typeof startingDataChec
           {wrong} of {rows.length} checks do not match. They are marked below.
         </Notice>
       )}
-      <Card className="p-0">
+      <Card className="p-0!">
         <ul className="divide-y divide-line">
           {rows.map((row) => (
             <li key={row.label} className="px-4 py-3">

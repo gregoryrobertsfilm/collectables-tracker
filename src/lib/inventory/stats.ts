@@ -71,7 +71,7 @@ export type Stats = {
   listedUnits: number
   /** For-sale copies that no live listing accounts for. This is the "to list" pile. */
   forSaleNotListed: number
-  /** Figures whose live listings offer more units than there are for-sale copies. */
+  /** Figures whose live listings offer more units than there are sound (no flaw) for-sale copies, not counting copies attached by hand. */
   overListedFigureIds: string[]
   /** Sales that still stand (refunded ones are left out). */
   sales: number
@@ -157,8 +157,10 @@ export function computeStats(snapshot: Snapshot): Stats {
  *   - every specific copy attached to a live listing (counted once, even if that same
  *     copy is listed on two sites), plus
  *   - for each live listing, the part of its quantity not covered by attached copies,
- * and never more than the number of for-sale copies that exist. Sealed blind boxes have
- * no figure, so no listing can account for them: they always count as not listed.
+ * and never more than exist. A copy with a flaw is never picked automatically: a listing's
+ * quantity draws only on copies with no flaw, so a flawed copy stays "not listed" until it
+ * is attached to a listing by hand. Sealed blind boxes have no figure, so no listing can
+ * account for them: they always count as not listed.
  */
 export function reserveForSaleCopies(
   forSaleCopies: SnapshotCopy[],
@@ -189,9 +191,11 @@ export function reserveForSaleCopies(
       for (const id of mine) attached.add(id)
       unattached += Math.max(0, listing.quantity - mine.length)
     }
-    const wanted = attached.size + unattached
-    if (wanted > copies.length) overListed.push(figureId)
-    notListed += copies.length - Math.min(copies.length, wanted)
+    // A listing's quantity may only draw on copies with no flaw. A flawed copy counts as
+    // listed only when it has been attached to a listing by hand (brief, section 10).
+    const sound = copies.filter((copy) => !copy.flaw && !attached.has(copy.id)).length
+    if (unattached > sound) overListed.push(figureId)
+    notListed += copies.length - attached.size - Math.min(sound, unattached)
   }
   return { notListed, overListed: overListed.sort() }
 }

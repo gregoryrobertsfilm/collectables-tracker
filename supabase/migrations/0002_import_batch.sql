@@ -30,21 +30,49 @@ begin
     raise exception 'The import is empty or not in the expected shape.';
   end if;
 
-  -- Editable lists: add any names that are not there yet.
-  insert into public.brands (name)
-  select distinct x.name
-  from jsonb_to_recordset(coalesce(payload -> 'brands', '[]'::jsonb)) as x(name text)
-  on conflict (owner_id, name) do nothing;
+  -- Editable lists: add any names that are not there yet (ignoring capitals), placed after
+  -- the ones already there so a later import never shuffles the existing order.
+  insert into public.brands (name, sort_order)
+  select n.name,
+         (select coalesce(max(b.sort_order), 0) from public.brands b where b.owner_id = uid)
+           + row_number() over (order by n.name)
+  from (
+    select distinct on (lower(x.name)) x.name
+    from jsonb_to_recordset(coalesce(payload -> 'brands', '[]'::jsonb)) as x(name text)
+    where x.name is not null
+    order by lower(x.name), x.name
+  ) n
+  where not exists (
+    select 1 from public.brands b where b.owner_id = uid and lower(b.name) = lower(n.name))
+  on conflict (owner_id, lower(name)) do nothing;
 
   insert into public.storage_locations (name, sort_order)
-  select x.name, coalesce(x.sort_order, 0)
-  from jsonb_to_recordset(coalesce(payload -> 'storage_locations', '[]'::jsonb)) as x(name text, sort_order integer)
-  on conflict (owner_id, name) do nothing;
+  select n.name,
+         (select coalesce(max(s.sort_order), 0) from public.storage_locations s where s.owner_id = uid)
+           + row_number() over (order by n.sort_order, n.name)
+  from (
+    select distinct on (lower(x.name)) x.name, coalesce(x.sort_order, 0) as sort_order
+    from jsonb_to_recordset(coalesce(payload -> 'storage_locations', '[]'::jsonb)) as x(name text, sort_order integer)
+    where x.name is not null
+    order by lower(x.name), x.name
+  ) n
+  where not exists (
+    select 1 from public.storage_locations s where s.owner_id = uid and lower(s.name) = lower(n.name))
+  on conflict (owner_id, lower(name)) do nothing;
 
   insert into public.platforms (name, sort_order)
-  select x.name, coalesce(x.sort_order, 0)
-  from jsonb_to_recordset(coalesce(payload -> 'platforms', '[]'::jsonb)) as x(name text, sort_order integer)
-  on conflict (owner_id, name) do nothing;
+  select n.name,
+         (select coalesce(max(p.sort_order), 0) from public.platforms p where p.owner_id = uid)
+           + row_number() over (order by n.sort_order, n.name)
+  from (
+    select distinct on (lower(x.name)) x.name, coalesce(x.sort_order, 0) as sort_order
+    from jsonb_to_recordset(coalesce(payload -> 'platforms', '[]'::jsonb)) as x(name text, sort_order integer)
+    where x.name is not null
+    order by lower(x.name), x.name
+  ) n
+  where not exists (
+    select 1 from public.platforms p where p.owner_id = uid and lower(p.name) = lower(n.name))
+  on conflict (owner_id, lower(name)) do nothing;
 
   -- Releases
   want := jsonb_array_length(coalesce(payload -> 'releases', '[]'::jsonb));
@@ -53,7 +81,7 @@ begin
   from jsonb_to_recordset(coalesce(payload -> 'releases', '[]'::jsonb)) as x(
     brand text, code text, name text, license text, edition_size integer, exclusive text,
     barcode text, box_number text, url text, notes text)
-  join public.brands b on b.owner_id = uid and b.name = x.brand;
+  join public.brands b on b.owner_id = uid and lower(b.name) = lower(x.brand);
   get diagnostics got = row_count;
   if got <> want then
     raise exception 'Releases: expected to save % but only % matched a brand.', want, got;
@@ -78,7 +106,7 @@ begin
   select count(*) into got
   from jsonb_to_recordset(coalesce(payload -> 'copies', '[]'::jsonb)) as x(figure_code text, storage text)
   left join public.figures f on f.owner_id = uid and f.code = x.figure_code
-  left join public.storage_locations s on s.owner_id = uid and s.name = x.storage
+  left join public.storage_locations s on s.owner_id = uid and lower(s.name) = lower(x.storage)
   where (x.figure_code is not null and f.id is null) or (x.storage is not null and s.id is null);
   if got > 0 then
     raise exception 'Copies: % name a figure or storage location that does not exist.', got;
@@ -94,7 +122,7 @@ begin
     cost_cents integer, status text, source_note text)
   join public.releases r on r.owner_id = uid and r.code = x.release_code
   left join public.figures f on f.owner_id = uid and f.code = x.figure_code
-  left join public.storage_locations s on s.owner_id = uid and s.name = x.storage;
+  left join public.storage_locations s on s.owner_id = uid and lower(s.name) = lower(x.storage);
   get diagnostics got = row_count;
   if got <> want then
     raise exception 'Copies: expected to save % but only % matched a release.', want, got;
@@ -111,7 +139,7 @@ begin
     code text, platform text, status text, title text, price_cents integer, floor_cents integer,
     quantity integer, external_id text, url text, listed_on date, note text, source_note text,
     needs_review boolean)
-  join public.platforms p on p.owner_id = uid and p.name = x.platform;
+  join public.platforms p on p.owner_id = uid and lower(p.name) = lower(x.platform);
   get diagnostics got = row_count;
   if got <> want then
     raise exception 'Listings: expected to save % but only % matched a platform.', want, got;
@@ -144,19 +172,29 @@ begin
   end if;
   counts := counts || jsonb_build_object('listing_copies', got);
 
-  -- Sales
+  -- Sales. listing_code may be blank (the listing a sale came from is not always known).
   want := jsonb_array_length(coalesce(payload -> 'sales', '[]'::jsonb));
-  insert into public.sales (code, platform_id, sold_on, sale_price_cents, shipping_charged_cents,
+  select count(*) into got
+  from jsonb_to_recordset(coalesce(payload -> 'sales', '[]'::jsonb)) as x(listing_code text)
+  left join public.listings l on l.owner_id = uid and l.code = x.listing_code
+  where x.listing_code is not null and l.id is null;
+  if got > 0 then
+    raise exception 'Sales: % name a listing that does not exist.', got;
+  end if;
+
+  insert into public.sales (code, platform_id, listing_id, sold_on, sale_price_cents, shipping_charged_cents,
                             platform_fee_cents, label_cost_cents, other_cost_cents, buyer, order_number,
                             external_id, status, note, needs_review)
-  select x.code, p.id, x.sold_on, x.sale_price_cents, x.shipping_charged_cents, x.platform_fee_cents,
+  select x.code, p.id, l.id, x.sold_on, x.sale_price_cents, x.shipping_charged_cents, x.platform_fee_cents,
          x.label_cost_cents, x.other_cost_cents, x.buyer, x.order_number, x.external_id,
          coalesce(x.status, 'complete'), x.note, coalesce(x.needs_review, false)
   from jsonb_to_recordset(coalesce(payload -> 'sales', '[]'::jsonb)) as x(
-    code text, platform text, sold_on date, sale_price_cents integer, shipping_charged_cents integer,
-    platform_fee_cents integer, label_cost_cents integer, other_cost_cents integer, buyer text,
-    order_number text, external_id text, status text, note text, needs_review boolean)
-  join public.platforms p on p.owner_id = uid and p.name = x.platform;
+    code text, platform text, listing_code text, sold_on date, sale_price_cents integer,
+    shipping_charged_cents integer, platform_fee_cents integer, label_cost_cents integer,
+    other_cost_cents integer, buyer text, order_number text, external_id text, status text, note text,
+    needs_review boolean)
+  join public.platforms p on p.owner_id = uid and lower(p.name) = lower(x.platform)
+  left join public.listings l on l.owner_id = uid and l.code = x.listing_code;
   get diagnostics got = row_count;
   if got <> want then
     raise exception 'Sales: expected to save % but only % matched a platform.', want, got;

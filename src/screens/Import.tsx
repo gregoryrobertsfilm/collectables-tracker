@@ -6,7 +6,7 @@ import { useSnapshot } from '../data/useSnapshot'
 import { snapshotFromImport } from '../lib/import/checks'
 import type { ImportData, ImportProblem } from '../lib/import/model'
 import { parseWorkbook } from '../lib/import/parse'
-import { readSpreadsheetFile } from '../lib/import/read-xlsx'
+import { ReaderUnavailableError, ReadTimeoutError, readSpreadsheetFile } from '../lib/import/read-xlsx'
 import { computeStats, type Stats } from '../lib/inventory/stats'
 import { formatCents } from '../lib/money'
 import { supabase } from '../lib/supabase'
@@ -26,7 +26,8 @@ type Step =
 export function Import() {
   const { state: existing, reload } = useSnapshot()
   const [step, setStep] = useState<Step>({ name: 'choose' })
-  const [error, setError] = useState<string | null>(null)
+  // Where a problem happened decides where it is shown, so it is never off-screen on a phone.
+  const [error, setError] = useState<{ where: 'file' | 'save'; text: string } | null>(null)
   const input = useRef<HTMLInputElement>(null)
 
   async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
@@ -49,9 +50,17 @@ export function Import() {
         stats: computeStats(snapshotFromImport(result.data)),
         notes: result.notes,
       })
-    } catch {
+    } catch (problem) {
       setStep({ name: 'choose' })
-      setError('That file could not be read. It needs to be an Excel file (.xlsx) in the same layout as your starting data.')
+      setError({
+        where: 'file',
+        text:
+          problem instanceof ReaderUnavailableError
+            ? 'Couldn’t load the spreadsheet reader. Check your connection, or tap “Update now” if it is showing, then try again.'
+            : problem instanceof ReadTimeoutError
+              ? 'Reading that file took too long and was stopped. Try again; if it keeps happening, tell Claude.'
+              : 'That file could not be read. It needs to be an Excel file (.xlsx) in the same layout as your starting data.',
+      })
     }
   }
 
@@ -65,7 +74,7 @@ export function Import() {
       reload()
     } catch (problem) {
       setStep({ ...step, name: 'ready' })
-      setError(problem instanceof Error ? problem.message : 'The import failed. Nothing was changed.')
+      setError({ where: 'save', text: problem instanceof Error ? problem.message : 'The import failed. Nothing was changed.' })
     }
   }
 
@@ -81,7 +90,7 @@ export function Import() {
         </p>
       </div>
 
-      {error ? <Notice tone="bad">{error}</Notice> : null}
+      {error?.where === 'file' ? <Notice tone="bad">{error.text}</Notice> : null}
 
       {step.name === 'done' ? (
         <Card>
@@ -119,7 +128,8 @@ export function Import() {
               </Notice>
             </div>
           ) : null}
-          <input ref={input} type="file" accept=".xlsx" className="sr-only" onChange={chooseFile} aria-label="Spreadsheet file" />
+          {/* The button below is the control; this input only opens the file picker. */}
+          <input ref={input} type="file" accept=".xlsx" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={chooseFile} />
           <div className="mt-3">
             <Button
               variant={step.name === 'choose' ? 'primary' : 'secondary'}
@@ -161,6 +171,7 @@ export function Import() {
           <h2 className="font-semibold">2. Check what’s in it</h2>
           <CountList
             rows={[
+              ['Brand', step.data.brands.map((b) => b.name).join(', ')],
               ['Releases', step.data.releases.length],
               ['Figures', step.data.figures.length],
               ['Copies you own', step.stats.copiesOwned],
@@ -181,6 +192,11 @@ export function Import() {
           ) : null}
           <h2 className="mt-5 font-semibold">3. Save it</h2>
           <p className="mt-1 text-sm text-ink-2">All of it is saved together. If anything is refused, nothing is saved.</p>
+          {error?.where === 'save' ? (
+            <div className="mt-3">
+              <Notice tone="bad">{error.text}</Notice>
+            </div>
+          ) : null}
           <div className="mt-3">
             <Button busy={step.name === 'saving'} onClick={save}>
               Import into my database

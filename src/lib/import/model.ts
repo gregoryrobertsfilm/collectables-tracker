@@ -76,6 +76,8 @@ export type ImportListingCopy = { listing_code: string; copy_code: string }
 export type ImportSale = {
   code: string
   platform: string
+  /** The listing this sale came from, when the file makes that clear. */
+  listing_code: string | null
   sold_on: string | null
   sale_price_cents: number
   shipping_charged_cents: number | null

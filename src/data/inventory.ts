@@ -162,6 +162,14 @@ export function friendlyDataError(error: { code?: string; message?: string } | n
   if (lower.includes('jwt') || code === 'PGRST301' || code === 'PGRST303') {
     return 'Your sign-in has expired. Sign out, sign in again, then retry.'
   }
+  if (code.startsWith('23') || code.startsWith('22')) {
+    // The database refused a row (a rule about what a value may be). Retrying cannot help.
+    return `The database refused one of the rows, so nothing was saved. Trying again will not help. Tell Claude: “import refused, code ${code}”.`
+  }
+  if (!code) {
+    // No answer we can read (for example a gateway error), so the outcome is not known.
+    return 'Something went wrong talking to the database, and the app could not confirm the result. Check Home before trying again.'
+  }
   return 'Something went wrong talking to the database. Nothing was changed. Please try again.'
 }
 

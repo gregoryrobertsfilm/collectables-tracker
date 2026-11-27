@@ -132,6 +132,16 @@ describe.skipIf(!present)("Greg's starting spreadsheet", () => {
     expect([v.platform_fee_cents, v.shipping_charged_cents, v.label_cost_cents]).toEqual([0, null, null])
   })
 
+  it('links the three sales that came from still-live multi-quantity listings', async () => {
+    const data = await load()
+    const linked = data.sales.filter((s) => s.listing_code !== null).map((s) => [s.code, s.listing_code])
+    expect(linked).toEqual([
+      ['S-005', 'L-005'],
+      ['S-008', 'L-005'],
+      ['S-011', 'L-001'],
+    ])
+  })
+
   it('lists storage locations and platforms in a sensible order', async () => {
     const data = await load()
     expect(data.storage_locations.map((s) => s.name)).toEqual(['Bag 01', 'Bag 02', 'Bag 03', 'Bag 04', 'Bag 05', 'Bag 06'])
