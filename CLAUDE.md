@@ -56,7 +56,7 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 |---|---|---|
 | 1 | Questions, plan and data model | Done 2026-11-26 (Greg approved) |
 | 2 | Accounts and hosting: a live, login-protected app with nothing in it | **Done 2026-11-26.** Live at https://collectables-tracker.collectables-tracker.workers.dev. Greg signed in on his Mac and iPhone; password reset tested. Loose ends: confirm he added the home-screen icon; make sure the latest commits are uploaded to GitHub (`git status -sb`). |
-| 3 | Releases, figures, copies; import the starting data; prove the section 10 counts; **switch on the nightly backup** | Not started |
+| 3 | Releases, figures, copies; import the starting data; prove the section 10 counts; **switch on the nightly backup** | **In progress.** Tables created in Supabase 2026-11-26 (migrations 0001, 0002) and audited. Import and check screens are on the preview address. Waiting for Greg to run the import there; then go live, then nightly backup. |
 | 4 | Catalogue, search and tags. Figure page. Collections | Not started |
 | 5 | Listings, listed badge, double-listing warning, "Not listed" view | Not started |
 | 6 | Sales, mark sold, take-down tasks, home screen | Not started |
@@ -84,7 +84,7 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 | `index.html` | The single page. Holds the iPhone home-screen tags. |
 | `src/main.tsx`, `src/App.tsx` | Start-up, and the **AuthGate**: nothing behind the login is drawn without a session. |
 | `src/auth/` | Sign-in state (`AuthProvider`, `auth-context`), plain-language error messages (`messages`). |
-| `src/screens/` | One file per screen: `Login`, `SetNewPassword`, `NotConnected`, `Home`, `Settings`. |
+| `src/screens/` | One file per screen: `Login`, `SetNewPassword`, `NotConnected`, `Home`, `Settings`, `Import`, `DataCheck`. |
 | `src/components/` | `AppShell` (title bar + navigation), `ui` (buttons, fields, cards), `update` (new-version notice). |
 | `src/lib/money.ts` | **All money maths.** Whole cents only. Fully tested. |
 | `src/lib/config.ts`, `src/lib/supabase.ts` | Reads and checks the two public Supabase values; the one shared database connection; password-reset link handling. |
@@ -96,7 +96,10 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 | `vite.config.ts` | Build settings, the build id and the settings guard. |
 | `wrangler.jsonc` | Cloudflare settings: serve `dist/` as plain files, with preview addresses on. |
 | `.env.example` | Shows the two settings the app needs. `.env` (real values) is created during setup. |
-| `supabase/` | (From stage 3) database structure as numbered SQL files. |
+| `supabase/migrations/` | Database structure as numbered SQL files. See "Changing the database structure". |
+| `src/lib/import/` | Reads a spreadsheet in the starting-data layout (`parse.ts`), the section 10 check table (`checks.ts`), the browser file reader (`read-xlsx.ts`). `starting-data.test.ts` reads Greg's real spreadsheet and must reproduce every section 10 number; it is skipped, with a warning, on a computer that does not have the file. |
+| `src/lib/inventory/stats.ts` | Works out all the at-a-glance numbers, including which for-sale copies are spoken for by listings. Runs on a spreadsheet and on the database alike. |
+| `src/data/` | The only place that talks to the database: `inventory.ts` (read everything, save an import, plain-language errors), `useSnapshot.ts`. |
 
 ### Security model (important)
 
@@ -110,7 +113,20 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 - Search engines: kept out by the `X-Robots-Tag: noindex` header in `public/_headers` and the matching tag in `index.html`. `robots.txt` deliberately *allows* fetching, because a blocked crawler never sees "noindex". None of this makes an address private; the login does.
 - No public file links, ever. Photos (later) go in a private storage bucket and are shown with short-lived signed links.
 
-### Data model (plain language; SQL arrives in stage 3)
+### Data model (as built in `supabase/migrations/0001_core.sql`)
+
+Rules that are easy to get wrong:
+
+- **"Listed" is computed, never stored** (`reserveForSaleCopies` in `src/lib/inventory/stats.ts`). A listing has figures (`listing_figures`: one, or two for a set) and a quantity. Specific copies are attached (`listing_copies`) only when it matters. A copy with a flaw is never counted as listed unless attached by hand. Sealed blind boxes (no figure) are never "listed".
+- **Codes** (`R-001`, `F-001`, `C-0001`, `L-001`, `S-001`) come from the spreadsheet and are optional for records made in the app. Sold-history copies are `SOLD-<sale>-<n>`.
+- `brands`, `platforms` and `storage_locations` names are unique ignoring capitals.
+- A copy's figure must belong to the copy's release (composite foreign key); moving a figure to another release carries its copies along.
+- The signed-in role cannot delete sales, sale_copies or import_runs (history is kept). Refunds will set a status, not delete.
+- `sale_copies` allows a copy under more than one sale (a refunded copy can be sold again); the app must make sure at most one of those sales is un-refunded.
+- The one-time Vinted review (brief section 10) is `needs_review = true` on Vinted listings and sales; the screen for it is built in stage 5.
+- Reading tables: the database returns at most 1,000 rows per request; `fetchAll` pages through with a fixed order.
+
+In plain language:
 
 - **Release** → has one or two **Figures** (Hero, Chase). Hero and Chase of the same release pair automatically.
 - **Figure** → has many **Copies**. A sealed blind box is a copy attached to a release with no figure until "Reveal".
@@ -169,7 +185,7 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 **Supabase** (free: 500 MB database, 1 GB files, no automatic backups, pauses after about a week without use)
 - [x] (2026-11-26) Greg signs up at supabase.com/dashboard/sign-up **with the email he will use to log in to the app** (see the mailer rule above). Password rules: 8 to 72 characters with an uppercase letter, a lowercase letter, a number and a symbol.
 - [x] (2026-11-26) Organization: any name, plan **Free**.
-- [x] (2026-11-26; project "Collectables Tracker", ref `mtpsviwgvlvdoppbpivt`, organization "Gregory's Collectables"; the three Data access boxes were set by Greg and are **not yet verified**: check before creating the first table in stage 3) Project: name `collectables-tracker`; "Generate a password" for the database and save it in his password manager at once (it is never shown again); region: the general Americas region. Under "Data access": leave **Enable Data API** on, **untick** "Grant API access to new tables automatically", **tick** "Enable RLS on new tables automatically". Leave Advanced Configuration alone.
+- [x] (2026-11-26; project "Collectables Tracker", ref `mtpsviwgvlvdoppbpivt`, organization "Gregory's Collectables"; the Data access boxes were **verified from inside the database**: the `ensure_rls` event trigger is on, and new tables get no select/insert/update/delete for `anon` or `authenticated` by default, only truncate/references/trigger/maintain, which every migration must revoke) Project: name `collectables-tracker`; "Generate a password" for the database and save it in his password manager at once (it is never shown again); region: the general Americas region. Under "Data access": leave **Enable Data API** on, **untick** "Grant API access to new tables automatically", **tick** "Enable RLS on new tables automatically". Leave Advanced Configuration alone.
 - [x] (2026-11-26, seen off in the dashboard) Authentication → Sign In / Providers → "User Signups": switch **off** "Allow new users to sign up". Leave "Allow anonymous sign-ins" off.
 - [x] (2026-11-26, one user present) Authentication → Users → Add user → Create new user: his email and a strong password he types himself, "Auto confirm user?" ticked.
 - [x] (2026-11-26; Greg could not find the values in the Connect window and asked Claude to fetch them through his Chrome extension: URL from the project address, key from Project Settings → API Keys. `DEPLOY=1 npm run check` passes.) The Project URL and the **Publishable** key go into the file `.env` in this folder. Never a key starting `sb_secret_` or a long one starting `eyJ`.
@@ -186,12 +202,22 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 - [x] (2026-11-26) Greg signed in on the live address in Safari on his iPhone and reached Home.
 - [ ] (not yet confirmed whether he added the icon) Greg adds the app to his iPhone home screen: Safari → Share → Add to Home Screen → leave "Open as Web App" on → Add. He signs in once more inside the installed app. (The icon, name and status-bar style are fixed at the moment of adding; changing them later means removing and re-adding the icon, which also signs him out.)
 
+### Changing the database structure (migrations)
+
+- Every change to tables is a numbered SQL file in `supabase/migrations/`, wrapped in `begin; ... commit;` so it applies completely or not at all, ending with `insert into public.schema_migrations (version) values ('NNNN_name');`. Never edit a file that has been applied; add a new one.
+- **How they are applied:** through the Supabase dashboard SQL Editor in Greg's Chrome (he approved this for stage 3; ask again for later stages). No database password is needed. Steps that worked: open `https://supabase.com/dashboard/project/mtpsviwgvlvdoppbpivt/sql/new`; copy the file to the clipboard with `pbcopy < file`; click in the editor and paste with cmd+v; confirm the editor holds exactly the file by comparing a SHA-256 computed in the page (`window.monaco.editor.getModels()[0].getValue()`) with `shasum -a 256 file`; click Run; expect "Success. No rows returned". The editor runs as the `postgres` role, which bypasses row security (so backups can read everything).
+- The SQL Editor tab then asks to confirm leaving because of the unsaved snippet. Nothing needs saving.
+- **After every migration, audit the locks** (both were done for 0001/0002 on 2026-11-26): (1) in the SQL editor, check each table has `relrowsecurity` true, exactly one policy, and that `anon` has no privileges and `authenticated` has no TRUNCATE; (2) from this Mac, `curl` each table and each function through `https://mtpsviwgvlvdoppbpivt.supabase.co/rest/v1/...` with only the publishable key and confirm every one answers 401 "permission denied".
+- **Take a backup before any migration that changes or removes existing columns or tables** (rule 9).
+- Applied so far: `0001_core` (brands, storage_locations, platforms, releases, figures, copies, listings, listing_figures, listing_copies, sales, sale_copies, import_runs, schema_migrations), `0002_import_batch` (the all-or-nothing import function).
+
 ### Uploading to GitHub (pushing)
 
 Claude Code's safety check **refuses to let Claude run `git push`** in this project (it treats sending files to an outside service as sensitive), and Claude must not change its own permission settings. So **Greg runs the upload himself**: give him the single line `cd "/Users/gregoryroberts/Documents/Collectables Business" && git push` in a `bash` code block (he uses the Run button on it) or open a Terminal panel tab in this folder for him to type `git push`. Then confirm with `git status -sb` that local and GitHub match. Commit locally as often as needed, but batch the uploads so he is not asked after every small change: ask at the end of each stage and before anything risky. He found the first request confusing when it was explained in jargon; keep it to "click Run on this line" (2026-11-26).
 
 ### Things to know later
 
+- **Preview address:** https://preview-collectables-tracker.collectables-tracker.workers.dev (always the latest `npm run deploy:preview`). It uses the **same database** as the live app: only the app's code is a preview, the data is real.
 - **Preview and live addresses are public** (anyone with the link sees the login screen, nothing else). They can be put behind Cloudflare Access ("Protect all Workers" on the Workers & Pages overview) for free, but that needs Zero Trust set up, which asks for a payment card even though it is $0, and adds a second login for Greg. Not done; his call if he ever wants it.
 - **Supabase pausing:** the project pauses after about a week of low activity. Greg gets a warning email first; using the app prevents it. If paused: dashboard → the project → "Resume project", within one year, with all data kept. It is **not confirmed** that the nightly backup job counts as activity, so do not rely on it to keep the project awake.
 - **Nightly backup (end of stage 3):** a scheduled GitHub Actions job running `supabase db dump` through the **Session pooler** connection string (the direct connection is IPv6-only on the free plan and GitHub's machines are IPv4-only). Put the workflow in a **separate private repository** that holds only backups (so it never triggers anything else and dumps stay out of the app's history), with the connection string as that repository's secret `SUPABASE_DB_URL` (repository → Settings → Secrets and variables → Actions → New repository secret; Greg pastes it there, replacing `[YOUR-DATABASE-PASSWORD]`). Use `supabase/setup-cli@v3` with a pinned CLI version, schedule it at an off-peak minute (for example `17 3 * * *`), and make failures visible to Greg. Dumps contain his login email and password hash: private repository only. Dumps do not include stored files (photos, later).
@@ -206,3 +232,4 @@ Claude Code's safety check **refuses to let Claude run `git push`** in this proj
 | 2026-11-26 | Stage 2 (part 1): project created; login screen, password reset, empty Home and Settings (sign out here / everywhere), new-version notice, iPhone home-screen install files and icons, security headers, build-time settings guard, money maths library. 60 automated tests. Setup steps researched and fact-checked against today's official docs. Independent review (security, correctness, iPhone use, match to brief) run and its confirmed findings fixed. First commit made locally. Not yet online: waiting on Greg's accounts. |
 | 2026-11-26 | Stage 2 (part 2): GitHub repository created and code uploaded; Supabase project created, sign-up off, one user, app connected; Cloudflare account created and the app published for the first time. Live address works and shows only the sign-in screen. |
 | 2026-11-26 | Stage 2 complete: Supabase URL configuration set, password reset tested by Greg, live sign-in confirmed on Mac and iPhone. |
+| 2026-11-26 | Stage 3 (part 1): core tables and import function created in Supabase (0001, 0002) after an independent review whose 18 confirmed findings were fixed first; locks audited from inside and outside. Spreadsheet import, Import screen, Starting data check screen and Home counts built; 122 tests, including the real spreadsheet reproducing every section 10 number. Published to the preview address only. |
