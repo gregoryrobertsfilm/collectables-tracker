@@ -167,14 +167,14 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 - [ ] Recommended: Greg turns on two-factor authentication (Settings → Password and authentication) and saves the recovery codes.
 
 **Supabase** (free: 500 MB database, 1 GB files, no automatic backups, pauses after about a week without use)
-- [ ] Greg signs up at supabase.com/dashboard/sign-up **with the email he will use to log in to the app** (see the mailer rule above). Password rules: 8 to 72 characters with an uppercase letter, a lowercase letter, a number and a symbol.
-- [ ] Organization: any name, plan **Free**.
-- [ ] Project: name `collectables-tracker`; "Generate a password" for the database and save it in his password manager at once (it is never shown again); region: the general Americas region. Under "Data access": leave **Enable Data API** on, **untick** "Grant API access to new tables automatically", **tick** "Enable RLS on new tables automatically". Leave Advanced Configuration alone.
-- [ ] Authentication → Sign In / Providers → "User Signups": switch **off** "Allow new users to sign up". Leave "Allow anonymous sign-ins" off.
-- [ ] Authentication → Users → Add user → Create new user: his email and a strong password he types himself, "Auto confirm user?" ticked.
-- [ ] Greg copies the Project URL and the **Publishable** key (from the "Connect" button) into the file `.env` in this folder. Claude creates the file with two labelled blank lines and opens it for him. Never a key starting `sb_secret_` or a long one starting `eyJ`.
+- [x] (2026-11-26) Greg signs up at supabase.com/dashboard/sign-up **with the email he will use to log in to the app** (see the mailer rule above). Password rules: 8 to 72 characters with an uppercase letter, a lowercase letter, a number and a symbol.
+- [x] (2026-11-26) Organization: any name, plan **Free**.
+- [x] (2026-11-26; project "Collectables Tracker", ref `mtpsviwgvlvdoppbpivt`, organization "Gregory's Collectables"; the three Data access boxes were set by Greg and are **not yet verified**: check before creating the first table in stage 3) Project: name `collectables-tracker`; "Generate a password" for the database and save it in his password manager at once (it is never shown again); region: the general Americas region. Under "Data access": leave **Enable Data API** on, **untick** "Grant API access to new tables automatically", **tick** "Enable RLS on new tables automatically". Leave Advanced Configuration alone.
+- [x] (2026-11-26, seen off in the dashboard) Authentication → Sign In / Providers → "User Signups": switch **off** "Allow new users to sign up". Leave "Allow anonymous sign-ins" off.
+- [x] (2026-11-26, one user present) Authentication → Users → Add user → Create new user: his email and a strong password he types himself, "Auto confirm user?" ticked.
+- [x] (2026-11-26; Greg could not find the values in the Connect window and asked Claude to fetch them through his Chrome extension: URL from the project address, key from Project Settings → API Keys. `DEPLOY=1 npm run check` passes.) The Project URL and the **Publishable** key go into the file `.env` in this folder. Never a key starting `sb_secret_` or a long one starting `eyJ`.
 - [ ] After the first deploy: Authentication → URL Configuration → set "Site URL" to the live address and add it under "Redirect URLs" (plus `http://localhost:5173/**` for this Mac). Needed for password-reset links.
-- [ ] **Verify sign-up is really off:** try one sign-up call with a made-up address and confirm Supabase refuses it. Then test "Forgot password?" once end to end.
+- [ ] **Verify sign-up is really off:** done 2026-11-26 without creating anything: Supabase's own public settings address (`/auth/v1/settings`, called with the publishable key) reports `disable_signup: true` and anonymous sign-ins off. Re-run that check after any change to Auth settings. Still to do: test "Forgot password?" once end to end after the first deploy.
 
 **Cloudflare** (free: static files unlimited; preview addresses included)
 - [ ] Greg signs up at dash.cloudflare.com/sign-up with **email and password** (not Google/Apple/GitHub: those accounts start without a password, which blocks some later steps) and verifies his email. No card is asked for at sign-up.
