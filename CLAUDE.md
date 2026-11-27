@@ -25,7 +25,8 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 10. Every change must be undoable: commit to git, push to the private GitHub repository.
 11. Run `npm run check` (lint + tests + build) before every deploy. Never deploy with a failing test. Deploy only with `npm run deploy:preview` / `npm run deploy:live`, never by calling wrangler directly.
 12. **At the start of every session, check the backups**: `git fetch origin backups` then `git log -1 --format=%cd origin/backups`. If the newest backup is more than two days old, tell Greg first and fix it before other work.
-13. Keep him informed during long jobs. He asked "What's going on?" when a session went quiet for a long stretch (2026-11-26).
+13. **Keep his part tiny.** On 2026-11-26 he said the multi-step setup was exhausting and asked Claude to do it through his Chrome instead. Do everything possible for him (he is happy for Claude to use the Chrome extension on Supabase, GitHub and Cloudflare); design each step so what is left for him is one paste or one click; never hand him a list of manual steps when Claude could do them. Claude still may not type or handle passwords, keys or other secrets: for those, open the right page, fill in everything else, and leave him the single paste.
+14. Keep him informed during long jobs. He asked "What's going on?" when a session went quiet for a long stretch (2026-11-26).
 
 ## Decisions already made (do not re-ask)
 
@@ -57,7 +58,7 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 |---|---|---|
 | 1 | Questions, plan and data model | Done 2026-11-26 (Greg approved) |
 | 2 | Accounts and hosting: a live, login-protected app with nothing in it | **Done 2026-11-26.** Live at https://collectables-tracker.collectables-tracker.workers.dev. Greg signed in on his Mac and iPhone; password reset tested. Loose ends: confirm he added the home-screen icon; make sure the latest commits are uploaded to GitHub (`git status -sb`). |
-| 3 | Releases, figures, copies; import the starting data; prove the section 10 counts; **switch on the nightly backup** | **Nearly done.** Tables created and audited; Greg imported his spreadsheet on 2026-11-26 and the Starting data check showed all 14 section 10 numbers matching; that version is live. Nightly backup job written (`.github/workflows/backup.yml`) but **not running yet**: waiting for Greg to add the two secrets, upload, and run it once. |
+| 3 | Releases, figures, copies; import the starting data; prove the section 10 counts; **switch on the nightly backup** | **Nearly done.** Tables created and audited; Greg imported his spreadsheet on 2026-11-26 and the Starting data check showed all 14 section 10 numbers matching; that version is live. Nightly backup job written (`.github/workflows/backup.yml`) but **not running yet**: waiting for Greg to paste the one secret and upload; then run it once and confirm. |
 | 4 | Catalogue, search and tags. Figure page. Collections | Not started |
 | 5 | Listings, listed badge, double-listing warning, "Not listed" view | Not started |
 | 6 | Sales, mark sold, take-down tasks, home screen | Not started |
@@ -214,11 +215,14 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 
 ### Backups and restoring
 
-**What runs:** `.github/workflows/backup.yml`, a GitHub Actions job in this repository, every night at 09:17 UTC and on demand (repository → Actions → "Nightly database backup" → Run workflow). It copies the database with the Supabase tool (`supabase db dump`, pinned version, three files: roles, structure, data), checks the copy holds the main tables, locks it with a passphrase, proves the locked file opens, and commits it to the **`backups` branch** as `backups/<year>/collectables-YYYY-MM-DD.tar.gz.enc`. Greg chose passphrase-locked backups on 2026-11-26 because the data includes buyer usernames.
+**What runs:** `.github/workflows/backup.yml`, a GitHub Actions job in this repository, every night at 09:17 UTC and on demand (repository → Actions → "Nightly database backup" → Run workflow). It copies the database with the Supabase tool (`supabase db dump`, pinned version, three files: roles, structure, data), checks the copy holds the main tables, locks it (with the database password, see below), proves the locked file opens, and commits it to the **`backups` branch** as `backups/<year>/collectables-YYYY-MM-DD.tar.gz.enc`. Greg chose locked backups on 2026-11-26 because the data includes buyer usernames.
 
-**Two secrets** (repository → Settings → Secrets and variables → Actions; Greg adds them himself, never through chat):
-- `SUPABASE_DB_URL`: the **Session pooler** string `postgresql://postgres.mtpsviwgvlvdoppbpivt:<database password>@aws-0-us-west-2.pooler.supabase.com:5432/postgres`. (The direct address is IPv6-only on the free plan and GitHub's machines are IPv4-only.) Symbols in the password must be percent-encoded.
-- `BACKUP_PASSPHRASE`: at least 16 characters, kept in Greg's password manager as the backup passphrase. **If it is lost, the backups cannot be opened.** If it is ever changed, older backups still need the old one.
+**One secret** (repository → Settings → Secrets and variables → Actions; Greg pastes it himself, never through chat): `SUPABASE_DB_PASSWORD`, the Supabase database password exactly as it is. The job builds the connection address itself (Session pooler, `postgres.mtpsviwgvlvdoppbpivt` at `aws-0-us-west-2.pooler.supabase.com:5432`; the direct address is IPv6-only on the free plan and GitHub's machines are IPv4-only) and converts any symbols in the password.
+
+**The database password is also what locks each backup.** This was simplified on 2026-11-26 from a separate passphrase because Greg found the setup exhausting; it leaves him one thing to paste and nothing extra to keep. Consequences to remember:
+- A backup can be opened only with the database password **that was in force the night it was made**.
+- **Before the database password is ever reset:** have Greg keep the old one in his password manager (labelled with the date range it opens), then update the GitHub secret. Otherwise older backups can never be opened.
+- If the password is lost entirely, existing backups cannot be opened by anyone; reset it in Supabase, update the secret, and backups work again from that night on.
 
 **What a backup contains:** everything in the database, including the login email and password hash and buyer usernames. It does **not** contain stored files (photos, a later stage) and it is not a copy of the app's code (that is the `main` branch).
 
@@ -227,7 +231,7 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 **Restoring** (never without Greg's go-ahead; it replaces data):
 1. Take a fresh backup first (run the job by hand and wait for it to finish), so nothing entered since the last one can be lost.
 2. Get the file: `git fetch origin backups && git show origin/backups:backups/2026/collectables-YYYY-MM-DD.tar.gz.enc > /tmp/restore.enc`.
-3. Greg unlocks it himself in a Terminal panel, typing the passphrase when asked (it is not shown and never goes in chat): `openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -in /tmp/restore.enc | tar -xz -C /tmp/restore` (make the folder first). This works with the `openssl` built into his Mac. The options must match the job exactly.
+3. Greg unlocks it himself in a Terminal panel, typing the database password when asked (it is not shown and never goes in chat): `openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -in /tmp/restore.enc | tar -xz -C /tmp/restore` (make the folder first). This works with the `openssl` built into his Mac. The options must match the job exactly.
 4. Look at what is in `data.sql` and tell Greg what would change before doing anything.
 5. Loading it back needs a database connection with the database password (psql or the Supabase tool; neither is installed on this Mac today) or, for a small fix, pasting the relevant rows through the dashboard SQL editor. Work out the least destructive route for the actual problem: usually restoring specific tables or rows, not the whole database. Supabase's own guide: https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore
 6. Afterwards delete the unlocked files from `/tmp`.

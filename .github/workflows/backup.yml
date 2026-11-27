@@ -5,9 +5,12 @@
 # repository), checks that the locked file really opens, and saves it on the "backups"
 # branch of this repository under backups/<year>/.
 #
-# It needs two secrets (repository > Settings > Secrets and variables > Actions):
-#   SUPABASE_DB_URL    the database's "Session pooler" connection string, with the password in it
-#   BACKUP_PASSPHRASE  the passphrase the backups are locked with (kept in Greg's password manager)
+# It needs ONE secret (repository > Settings > Secrets and variables > Actions):
+#   SUPABASE_DB_PASSWORD   the Supabase database password, pasted exactly as it is
+#
+# That one password does two jobs: it lets this job read the database, and it is the
+# passphrase each backup is locked with. So a backup can only be opened by someone who
+# already holds the database password, which is kept in Greg's password manager.
 #
 # How to restore is described in CLAUDE.md ("Backups and restoring").
 
@@ -34,31 +37,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      # Not secret: which database to copy ("Session pooler" address, the one GitHub can reach).
+      DB_USER: postgres.mtpsviwgvlvdoppbpivt
+      DB_HOST: aws-0-us-west-2.pooler.supabase.com
       # Pinned so a new release of the tool can never change the backup without us choosing it.
       SUPABASE_CLI_VERSION: '3.4.0'
     steps:
-      - name: Check both secrets are set
+      - name: Check the secret is set
         run: |
-          if [ -z "$SUPABASE_DB_URL" ]; then
-            echo "::error::The SUPABASE_DB_URL secret is missing. Add it under Settings > Secrets and variables > Actions."
+          if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::error::The SUPABASE_DB_PASSWORD secret is missing. Add it under Settings > Secrets and variables > Actions."
             exit 1
           fi
-          if [ -z "$BACKUP_PASSPHRASE" ]; then
-            echo "::error::The BACKUP_PASSPHRASE secret is missing. Add it under Settings > Secrets and variables > Actions."
+          if [ "${#SUPABASE_DB_PASSWORD}" -lt 12 ]; then
+            echo "::error::SUPABASE_DB_PASSWORD is shorter than 12 characters, so it is probably not the database password."
             exit 1
           fi
-          if [ "${#BACKUP_PASSPHRASE}" -lt 16 ]; then
-            echo "::error::The BACKUP_PASSPHRASE is shorter than 16 characters. Use a longer one."
-            exit 1
-          fi
-          case "$SUPABASE_DB_URL" in
-            postgresql://*|postgres://*) ;;
-            *) echo "::error::SUPABASE_DB_URL does not look like a connection string (it should start with postgresql://)."; exit 1 ;;
-          esac
-          case "$SUPABASE_DB_URL" in
-            *"["*|*"PASTE-"*) echo "::error::SUPABASE_DB_URL still contains a placeholder. Replace it with the real database password."; exit 1 ;;
+          case "$SUPABASE_DB_PASSWORD" in
+            postgres*://*|*"PASTE-"*|*"["*"]"*) echo "::error::SUPABASE_DB_PASSWORD should be the password alone, not a connection string or a placeholder."; exit 1 ;;
           esac
 
       - name: Check out this repository
@@ -71,10 +68,15 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/dump"
           cd "$RUNNER_TEMP/dump"
+          # Build the connection address here, so the password can be pasted into the secret
+          # exactly as it is. Any symbols in it are converted to the form an address needs.
+          ENCODED="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')"
+          echo "::add-mask::$ENCODED"
+          DB_URL="postgresql://$DB_USER:$ENCODED@$DB_HOST:5432/postgres"
           cli() { npx -y "supabase@$SUPABASE_CLI_VERSION" "$@"; }
-          cli db dump --remote="$SUPABASE_DB_URL" -f roles.sql --role-only
-          cli db dump --remote="$SUPABASE_DB_URL" -f schema.sql
-          cli db dump --remote="$SUPABASE_DB_URL" -f data.sql --data-only --use-copy
+          cli db dump --remote="$DB_URL" -f roles.sql --role-only
+          cli db dump --remote="$DB_URL" -f schema.sql
+          cli db dump --remote="$DB_URL" -f data.sql --data-only --use-copy
 
       - name: Check the copy really holds the data
         run: |
@@ -99,7 +101,7 @@ jobs:
           done
           wc -c roles.sql schema.sql data.sql
 
-      - name: Lock it with the passphrase, and prove it opens
+      - name: Lock it with the database password, and prove it opens
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP"
@@ -111,10 +113,10 @@ jobs:
           # opened there without installing anything. Keep these options in step with the
           # restore command in CLAUDE.md.
           openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -salt \
-              -pass env:BACKUP_PASSPHRASE -in backup.tar.gz -out "$FILE"
-          # Open it again with the same passphrase and check all three files are inside.
+              -pass env:SUPABASE_DB_PASSWORD -in backup.tar.gz -out "$FILE"
+          # Open it again with the same password and check all three files are inside.
           LISTING="$(openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 \
-              -pass env:BACKUP_PASSPHRASE -in "$FILE" | tar -tzf -)"
+              -pass env:SUPABASE_DB_PASSWORD -in "$FILE" | tar -tzf -)"
           for name in roles.sql schema.sql data.sql; do
             echo "$LISTING" | grep -qx "$name" || { echo "::error::The locked backup does not contain $name."; exit 1; }
           done
