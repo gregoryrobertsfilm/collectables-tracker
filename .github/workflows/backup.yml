@@ -1,0 +1,160 @@
+# Nightly database backup.
+#
+# Every night this takes a full copy of the Supabase database, locks it with a passphrase
+# (so nobody can read it without that passphrase, not even someone who gets into this
+# repository), checks that the locked file really opens, and saves it on the "backups"
+# branch of this repository under backups/<year>/.
+#
+# It needs two secrets (repository > Settings > Secrets and variables > Actions):
+#   SUPABASE_DB_URL    the database's "Session pooler" connection string, with the password in it
+#   BACKUP_PASSPHRASE  the passphrase the backups are locked with (kept in Greg's password manager)
+#
+# How to restore is described in CLAUDE.md ("Backups and restoring").
+
+name: Nightly database backup
+
+on:
+  schedule:
+    # 09:17 UTC every day: the small hours in California. An odd minute on purpose;
+    # GitHub is busiest, and most likely to skip a run, on the hour.
+    - cron: '17 9 * * *'
+  # Also lets it be started by hand from the Actions tab ("Run workflow").
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Back up the database
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      # Pinned so a new release of the tool can never change the backup without us choosing it.
+      SUPABASE_CLI_VERSION: '3.4.0'
+    steps:
+      - name: Check both secrets are set
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::The SUPABASE_DB_URL secret is missing. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::The BACKUP_PASSPHRASE secret is missing. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          if [ "${#BACKUP_PASSPHRASE}" -lt 16 ]; then
+            echo "::error::The BACKUP_PASSPHRASE is shorter than 16 characters. Use a longer one."
+            exit 1
+          fi
+          case "$SUPABASE_DB_URL" in
+            postgresql://*|postgres://*) ;;
+            *) echo "::error::SUPABASE_DB_URL does not look like a connection string (it should start with postgresql://)."; exit 1 ;;
+          esac
+          case "$SUPABASE_DB_URL" in
+            *"["*|*"PASTE-"*) echo "::error::SUPABASE_DB_URL still contains a placeholder. Replace it with the real database password."; exit 1 ;;
+          esac
+
+      - name: Check out this repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Copy the database
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/dump"
+          cd "$RUNNER_TEMP/dump"
+          cli() { npx -y "supabase@$SUPABASE_CLI_VERSION" "$@"; }
+          cli db dump --remote="$SUPABASE_DB_URL" -f roles.sql --role-only
+          cli db dump --remote="$SUPABASE_DB_URL" -f schema.sql
+          cli db dump --remote="$SUPABASE_DB_URL" -f data.sql --data-only --use-copy
+
+      - name: Check the copy really holds the data
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/dump"
+          for file in roles.sql schema.sql data.sql; do
+            if [ ! -s "$file" ]; then
+              echo "::error::$file is missing or empty, so this backup would be useless."
+              exit 1
+            fi
+          done
+          # Only names and sizes are printed. Never print the contents: they are private.
+          for table in releases figures copies listings sales; do
+            if ! grep -Eq "^COPY \"?public\"?\.\"?$table\"? " data.sql; then
+              echo "::error::The backup has no data section for the \"$table\" table."
+              exit 1
+            fi
+            if ! grep -Eq "CREATE TABLE (IF NOT EXISTS )?\"?public\"?\.\"?$table\"? " schema.sql; then
+              echo "::error::The backup has no structure for the \"$table\" table."
+              exit 1
+            fi
+          done
+          wc -c roles.sql schema.sql data.sql
+
+      - name: Lock it with the passphrase, and prove it opens
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          STAMP="$(date -u +%Y-%m-%d)"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          FILE="collectables-$STAMP.tar.gz.enc"
+          tar -C dump -czf backup.tar.gz roles.sql schema.sql data.sql
+          # openssl is used (not gpg) because Greg's Mac has it built in, so a backup can be
+          # opened there without installing anything. Keep these options in step with the
+          # restore command in CLAUDE.md.
+          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -salt \
+              -pass env:BACKUP_PASSPHRASE -in backup.tar.gz -out "$FILE"
+          # Open it again with the same passphrase and check all three files are inside.
+          LISTING="$(openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 \
+              -pass env:BACKUP_PASSPHRASE -in "$FILE" | tar -tzf -)"
+          for name in roles.sql schema.sql data.sql; do
+            echo "$LISTING" | grep -qx "$name" || { echo "::error::The locked backup does not contain $name."; exit 1; }
+          done
+          # The readable copies are no longer needed. Remove them from this machine.
+          rm -rf dump backup.tar.gz
+          ls -l "$FILE"
+
+      - name: Save it on the backups branch
+        run: |
+          set -euo pipefail
+          FILE="collectables-$STAMP.tar.gz.enc"
+          YEAR="${STAMP%%-*}"
+          git config user.name "Nightly backup"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin backups >/dev/null 2>&1; then
+            git fetch --depth=1 origin backups
+            git checkout -q -B backups FETCH_HEAD
+          else
+            # First ever backup: start an empty branch that holds backups and nothing else.
+            git checkout -q --orphan backups
+            git rm -rfq .
+            git clean -fdxq
+          fi
+          mkdir -p "backups/$YEAR"
+          cp "$RUNNER_TEMP/$FILE" "backups/$YEAR/$FILE"
+          cat > README.md <<'TEXT'
+          # Collectables Tracker: database backups
+
+          One locked file per night, under `backups/<year>/`. Each is a full copy of the
+          database (structure and data), locked with the backup passphrase kept in Greg's
+          password manager. Without that passphrase the files cannot be read.
+
+          To restore, open the project in Claude Code and say:
+          "Something is wrong with my data. Restore from the latest backup."
+          TEXT
+          git add README.md "backups/$YEAR/$FILE"
+          if git diff --cached --quiet; then
+            echo "Nothing new to save."
+          else
+            git commit -q -m "Backup $STAMP"
+            git push -q origin backups
+          fi
+          echo "Saved backups/$YEAR/$FILE"

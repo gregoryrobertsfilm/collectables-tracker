@@ -6,7 +6,7 @@ This page is written for you, Greg, not for a programmer. You never need to edit
 
 ## Status today
 
-**Stage 2 done.** The app is online at **https://collectables-tracker.collectables-tracker.workers.dev** and only you can sign in. It holds **no data yet**; your figures are loaded in stage 3.
+**Stage 3 nearly done.** The app is online at **https://collectables-tracker.collectables-tracker.workers.dev**, only you can sign in, and your starting data is loaded. Browsing and searching your figures arrives in stage 4.
 
 ## Where things live
 
@@ -14,30 +14,29 @@ This page is written for you, Greg, not for a programmer. You never need to edit
 |---|---|---|
 | The app's code | This folder. Every change is saved as a step that can be undone. | Working on this Mac. |
 | Backup of the code | Your private GitHub repository, `gregoryrobertsfilm/collectables-tracker`. | **Set up.** A copy is uploaded at the end of each stage; you run the upload with one click when Claude asks. |
-| Your data | Supabase (the database): figures, copies, listings, sales, purchases. Photos later. | **Set up**, and empty. Only your login exists. |
+| Your data | Supabase (the database): figures, copies, listings, sales. Purchases and photos later. | **Loaded** from your starting spreadsheet. |
 | The live app | Cloudflare (the web host). Serves the app to your phone and computer. Holds no data. | **Online** at the address above. |
 | Your starting spreadsheet | `Thrilljoy Starting Data for Claude Code - Greg.xlsx` in this folder. | This is your original. It is **not** sent to GitHub (it contains buyer usernames). Keep your own copy somewhere safe. |
 
 ## Backing up your data
 
-**Today: the database is empty, so there is nothing to back up.** Your only data is the starting spreadsheet in this folder. Keep a copy of this whole folder somewhere safe (iCloud Drive or an external drive).
+Your data now lives in the database: 226 copies, 110 figures, 26 listings and 17 sales, loaded from your starting spreadsheet on 26 November 2026.
 
-What is planned, and when each part becomes real:
+1. **Automatic nightly backup.** Every night a full copy of the database is saved to a private "backups" area of your GitHub repository. Each copy is locked with your **backup passphrase**, so nobody can read it without that passphrase, even if they got into your GitHub. **Status: set up but not running until you have added the two secrets and it has run once.** (This line will be updated when the first backup is confirmed.)
+2. **Your backup passphrase** lives in your password manager. Keep it. If it is ever lost, the backups cannot be opened by anyone, including Claude.
+3. **One-button export: stage 8.** In the app: Settings → Export. Downloads all your data as spreadsheet (CSV) files. **Not built yet.**
+4. **Your starting spreadsheet** in this folder is still your original. Keep your own copy of it somewhere safe; it is not on GitHub.
 
-1. **Automatic nightly backup: switched on at the end of stage 3**, as soon as your data is loaded. A full copy of the database is saved every night to a private place on GitHub without you doing anything. **Not set up yet.**
-2. **One-button export: stage 8.** In the app: Settings → Export. Downloads all your data as spreadsheet (CSV) files you can open in Excel or Numbers. **Not built yet.**
-3. **Supabase itself** keeps your data on professional servers. Its free plan does not include its own daily backups, which is why items 1 and 2 exist.
-
-This section will be rewritten with exact steps when each part is switched on.
+If a nightly backup fails, GitHub emails you. Claude also checks the date of the newest backup at the start of every session.
 
 ## Restoring your data
 
-**Today: there are no backups yet, so there is nothing to restore from.** Once the nightly backup is on (end of stage 3):
-
 1. **Stop making changes in the app.**
-2. Open this folder in Claude Code and say: *"Something is wrong with my data. Restore from the latest backup."* Claude will show you what backups exist, what each contains, and what would change, and will ask before touching anything.
+2. Open this folder in Claude Code and say: *"Something is wrong with my data. Restore from the latest backup."*
+3. Claude will take a fresh backup first, show you what backups exist and what would change, and ask before touching anything.
+4. At one point you will be asked to type your backup passphrase into a terminal panel on your Mac. It is never typed into the chat.
 
-Restoring replaces what's in the database with a saved copy. Anything entered after that copy was made would be lost, so Claude will always take a fresh backup first.
+Restoring replaces data with a saved copy, so anything entered after that copy was made could be lost. That is why a fresh backup is always taken first, and why Claude will usually restore only the part that went wrong.
 
 ## If the app itself breaks (not the data)
 

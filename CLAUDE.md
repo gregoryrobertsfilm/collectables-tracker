@@ -24,7 +24,8 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 9. **Never delete or overwrite his real data** when changing the app. Take a backup before any change to how data is stored.
 10. Every change must be undoable: commit to git, push to the private GitHub repository.
 11. Run `npm run check` (lint + tests + build) before every deploy. Never deploy with a failing test. Deploy only with `npm run deploy:preview` / `npm run deploy:live`, never by calling wrangler directly.
-12. Keep him informed during long jobs. He asked "What's going on?" when a session went quiet for a long stretch (2026-11-26).
+12. **At the start of every session, check the backups**: `git fetch origin backups` then `git log -1 --format=%cd origin/backups`. If the newest backup is more than two days old, tell Greg first and fix it before other work.
+13. Keep him informed during long jobs. He asked "What's going on?" when a session went quiet for a long stretch (2026-11-26).
 
 ## Decisions already made (do not re-ask)
 
@@ -56,7 +57,7 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 |---|---|---|
 | 1 | Questions, plan and data model | Done 2026-11-26 (Greg approved) |
 | 2 | Accounts and hosting: a live, login-protected app with nothing in it | **Done 2026-11-26.** Live at https://collectables-tracker.collectables-tracker.workers.dev. Greg signed in on his Mac and iPhone; password reset tested. Loose ends: confirm he added the home-screen icon; make sure the latest commits are uploaded to GitHub (`git status -sb`). |
-| 3 | Releases, figures, copies; import the starting data; prove the section 10 counts; **switch on the nightly backup** | **In progress.** Tables created in Supabase 2026-11-26 (migrations 0001, 0002) and audited. Import and check screens are on the preview address. Waiting for Greg to run the import there; then go live, then nightly backup. |
+| 3 | Releases, figures, copies; import the starting data; prove the section 10 counts; **switch on the nightly backup** | **Nearly done.** Tables created and audited; Greg imported his spreadsheet on 2026-11-26 and the Starting data check showed all 14 section 10 numbers matching; that version is live. Nightly backup job written (`.github/workflows/backup.yml`) but **not running yet**: waiting for Greg to add the two secrets, upload, and run it once. |
 | 4 | Catalogue, search and tags. Figure page. Collections | Not started |
 | 5 | Listings, listed badge, double-listing warning, "Not listed" view | Not started |
 | 6 | Sales, mark sold, take-down tasks, home screen | Not started |
@@ -211,6 +212,28 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 - **Take a backup before any migration that changes or removes existing columns or tables** (rule 9).
 - Applied so far: `0001_core` (brands, storage_locations, platforms, releases, figures, copies, listings, listing_figures, listing_copies, sales, sale_copies, import_runs, schema_migrations), `0002_import_batch` (the all-or-nothing import function).
 
+### Backups and restoring
+
+**What runs:** `.github/workflows/backup.yml`, a GitHub Actions job in this repository, every night at 09:17 UTC and on demand (repository → Actions → "Nightly database backup" → Run workflow). It copies the database with the Supabase tool (`supabase db dump`, pinned version, three files: roles, structure, data), checks the copy holds the main tables, locks it with a passphrase, proves the locked file opens, and commits it to the **`backups` branch** as `backups/<year>/collectables-YYYY-MM-DD.tar.gz.enc`. Greg chose passphrase-locked backups on 2026-11-26 because the data includes buyer usernames.
+
+**Two secrets** (repository → Settings → Secrets and variables → Actions; Greg adds them himself, never through chat):
+- `SUPABASE_DB_URL`: the **Session pooler** string `postgresql://postgres.mtpsviwgvlvdoppbpivt:<database password>@aws-0-us-west-2.pooler.supabase.com:5432/postgres`. (The direct address is IPv6-only on the free plan and GitHub's machines are IPv4-only.) Symbols in the password must be percent-encoded.
+- `BACKUP_PASSPHRASE`: at least 16 characters, kept in Greg's password manager as the backup passphrase. **If it is lost, the backups cannot be opened.** If it is ever changed, older backups still need the old one.
+
+**What a backup contains:** everything in the database, including the login email and password hash and buyer usernames. It does **not** contain stored files (photos, a later stage) and it is not a copy of the app's code (that is the `main` branch).
+
+**Checking backups:** `git fetch origin backups && git log -3 --format='%cd %s' origin/backups && git ls-tree -r --name-only origin/backups | tail -5`. Failed runs email Greg from GitHub. It is not confirmed whether GitHub pauses scheduled jobs in a quiet private repository after 60 days; the session-start check (rule 12) is the safety net. It is also not confirmed that the nightly job counts as "activity" that stops Supabase pausing the project.
+
+**Restoring** (never without Greg's go-ahead; it replaces data):
+1. Take a fresh backup first (run the job by hand and wait for it to finish), so nothing entered since the last one can be lost.
+2. Get the file: `git fetch origin backups && git show origin/backups:backups/2026/collectables-YYYY-MM-DD.tar.gz.enc > /tmp/restore.enc`.
+3. Greg unlocks it himself in a Terminal panel, typing the passphrase when asked (it is not shown and never goes in chat): `openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 -in /tmp/restore.enc | tar -xz -C /tmp/restore` (make the folder first). This works with the `openssl` built into his Mac. The options must match the job exactly.
+4. Look at what is in `data.sql` and tell Greg what would change before doing anything.
+5. Loading it back needs a database connection with the database password (psql or the Supabase tool; neither is installed on this Mac today) or, for a small fix, pasting the relevant rows through the dashboard SQL editor. Work out the least destructive route for the actual problem: usually restoring specific tables or rows, not the whole database. Supabase's own guide: https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore
+6. Afterwards delete the unlocked files from `/tmp`.
+
+A full restore has **not been rehearsed yet**. Do one practice run (unlock a backup and inspect it) soon after the first backups exist, and record the result here.
+
 ### Uploading to GitHub (pushing)
 
 Claude Code's safety check **refuses to let Claude run `git push`** in this project (it treats sending files to an outside service as sensitive), and Claude must not change its own permission settings. So **Greg runs the upload himself**: give him the single line `cd "/Users/gregoryroberts/Documents/Collectables Business" && git push` in a `bash` code block (he uses the Run button on it) or open a Terminal panel tab in this folder for him to type `git push`. Then confirm with `git status -sb` that local and GitHub match. Commit locally as often as needed, but batch the uploads so he is not asked after every small change: ask at the end of each stage and before anything risky. He found the first request confusing when it was explained in jargon; keep it to "click Run on this line" (2026-11-26).
@@ -220,7 +243,6 @@ Claude Code's safety check **refuses to let Claude run `git push`** in this proj
 - **Preview address:** https://preview-collectables-tracker.collectables-tracker.workers.dev (always the latest `npm run deploy:preview`). It uses the **same database** as the live app: only the app's code is a preview, the data is real.
 - **Preview and live addresses are public** (anyone with the link sees the login screen, nothing else). They can be put behind Cloudflare Access ("Protect all Workers" on the Workers & Pages overview) for free, but that needs Zero Trust set up, which asks for a payment card even though it is $0, and adds a second login for Greg. Not done; his call if he ever wants it.
 - **Supabase pausing:** the project pauses after about a week of low activity. Greg gets a warning email first; using the app prevents it. If paused: dashboard → the project → "Resume project", within one year, with all data kept. It is **not confirmed** that the nightly backup job counts as activity, so do not rely on it to keep the project awake.
-- **Nightly backup (end of stage 3):** a scheduled GitHub Actions job running `supabase db dump` through the **Session pooler** connection string (the direct connection is IPv6-only on the free plan and GitHub's machines are IPv4-only). Put the workflow in a **separate private repository** that holds only backups (so it never triggers anything else and dumps stay out of the app's history), with the connection string as that repository's secret `SUPABASE_DB_URL` (repository → Settings → Secrets and variables → Actions → New repository secret; Greg pastes it there, replacing `[YOUR-DATABASE-PASSWORD]`). Use `supabase/setup-cli@v3` with a pinned CLI version, schedule it at an off-peak minute (for example `17 3 * * *`), and make failures visible to Greg. Dumps contain his login email and password hash: private repository only. Dumps do not include stored files (photos, later).
 - **If GitHub builds are ever connected to Cloudflare:** set `"packageManager": "npm@<version>"` to match this Mac (already in `package.json`), keep `"previews": {}` in `wrangler.jsonc`, and commit `wrangler.jsonc` first.
 - **Custom domain later:** needs a domain active in Greg's Cloudflare account (roughly the price of the domain per year); then Worker → Domains → Add.
 
@@ -233,3 +255,4 @@ Claude Code's safety check **refuses to let Claude run `git push`** in this proj
 | 2026-11-26 | Stage 2 (part 2): GitHub repository created and code uploaded; Supabase project created, sign-up off, one user, app connected; Cloudflare account created and the app published for the first time. Live address works and shows only the sign-in screen. |
 | 2026-11-26 | Stage 2 complete: Supabase URL configuration set, password reset tested by Greg, live sign-in confirmed on Mac and iPhone. |
 | 2026-11-26 | Stage 3 (part 1): core tables and import function created in Supabase (0001, 0002) after an independent review whose 18 confirmed findings were fixed first; locks audited from inside and outside. Spreadsheet import, Import screen, Starting data check screen and Home counts built; 122 tests, including the real spreadsheet reproducing every section 10 number. Published to the preview address only. |
+| 2026-11-26 | Stage 3 (part 2): Greg imported his starting spreadsheet; all 14 section 10 checks match in the live database; that version went live. Nightly passphrase-locked backup job written; waiting on Greg's two secrets and a first run. |
