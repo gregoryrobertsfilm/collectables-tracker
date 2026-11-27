@@ -1,0 +1,17 @@
+{
+  // Tells Cloudflare how to serve the app: plain files from the "dist" folder, no server code.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "collectables-tracker",
+  "compatibility_date": "2026-11-26",
+  "assets": {
+    "directory": "./dist",
+    // Any address inside the app (for example /settings) loads the app, which then shows the right screen.
+    "not_found_handling": "single-page-application"
+  },
+  // The live address: collectables-tracker.<account-subdomain>.workers.dev
+  "workers_dev": true,
+  // Preview addresses, so Greg can try a change before it replaces the live app.
+  // They are reachable by anyone who has the link, but show only the login screen: all data is behind the login.
+  "preview_urls": true,
+  "previews": {}
+}

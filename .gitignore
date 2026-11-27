@@ -1,0 +1,42 @@
+# Installed building blocks and build output (recreated by "npm install" / "npm run build")
+node_modules
+dist
+dist-ssr
+.wrangler
+
+# Private settings that must never be backed up to GitHub.
+# (The file named exactly ".env" is NOT ignored, on purpose: it holds only the two
+# public Supabase values that ship to every browser anyway. See CLAUDE.md.)
+*.local
+.env.*
+!.env.example
+.dev.vars
+
+# Settings that only make sense on this one Mac
+.claude/settings.local.json
+.claude/launch.json
+
+# The starting spreadsheet holds real buyer usernames and order numbers.
+# Kept off GitHub until Greg decides otherwise (see CLAUDE.md, "Still open with Greg").
+Thrilljoy Starting Data for Claude Code - Greg.xlsx
+
+# Database backups taken on this Mac
+backups/
+
+# Excel's temporary lock files (appear while a spreadsheet is open)
+~$*
+
+# Test tool output
+.vitest/
+
+# Logs and system files
+logs
+*.log
+npm-debug.log*
+.DS_Store
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.sw?

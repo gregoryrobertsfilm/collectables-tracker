@@ -1,0 +1,5 @@
+# Private app. Search engines are told not to list it by a "noindex" instruction sent with
+# every page (see public/_headers). They must be allowed to fetch a page to see that
+# instruction, which is why this file does not block them.
+User-agent: *
+Allow: /

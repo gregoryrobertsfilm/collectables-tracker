@@ -1,0 +1,18 @@
+# Security rules the web host attaches to every page of the app.
+# In plain words: only load code from this app itself, only talk to Supabase,
+# never allow the app to be embedded inside another website, and stay out of search engines.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow
+  Permissions-Policy: geolocation=(), microphone=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000
+
+# The page itself is always re-checked by the browser (the host's default), so updates show up straight away.
+
+# Built files have a unique fingerprint in their name, so they can be kept forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

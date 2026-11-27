@@ -1,0 +1,121 @@
+@import 'tailwindcss';
+
+/*
+  Design tokens. Every colour used by the screens comes from here. Light and dark follow
+  the phone's own setting. Text colours are chosen to pass the WCAG AA contrast standard
+  (4.5:1) on every background below; re-check if you change them.
+
+  The page colour is repeated in index.html (theme-color) and public/manifest.webmanifest,
+  and the accent colour in scripts/make-icons.mjs. Change those too, then run `npm run icons`.
+*/
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --color-page: #f6f5f2;
+  --color-surface: #ffffff;
+  --color-surface-2: #efede8;
+  --color-line: #e2dfd8;
+  --color-ink: #1b1b1f;
+  --color-ink-2: #5b5a62;
+  --color-ink-3: #6b6a73;
+  --color-accent: #3d3bd6;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #e8e8fb;
+  --color-good: #17794a;
+  --color-good-soft: #dff3e8;
+  --color-warn: #9a5b00;
+  --color-warn-soft: #fbeed3;
+  --color-bad: #b3261e;
+  --color-bad-soft: #fbe4e2;
+}
+
+@layer base {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-page: #141416;
+      --color-surface: #1e1e22;
+      --color-surface-2: #29292f;
+      --color-line: #34343b;
+      --color-ink: #f2f1ee;
+      --color-ink-2: #b4b3bb;
+      --color-ink-3: #9b9aa3;
+      --color-accent: #8f8dff;
+      --color-accent-ink: #111114;
+      --color-accent-soft: #2a2a55;
+      --color-good: #6fd6a0;
+      --color-good-soft: #173527;
+      --color-warn: #f0b860;
+      --color-warn-soft: #3a2c12;
+      --color-bad: #ff8a80;
+      --color-bad-soft: #401c19;
+    }
+  }
+
+  :root {
+    color-scheme: light dark;
+  }
+
+  html {
+    /* Matches the page so there is no white flash while the app opens from the home screen. */
+    background: var(--color-page);
+    /* Stops the whole page rubber-banding. iPhone reads this from <html>, not <body>. */
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    background: var(--color-page);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+
+  /* iPhone zooms the page when a text box has text smaller than 16px. Never go below it. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Space for the iPhone notch and home indicator. */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
