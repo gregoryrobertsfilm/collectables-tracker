@@ -173,6 +173,7 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 - [x] (2026-11-26, seen off in the dashboard) Authentication → Sign In / Providers → "User Signups": switch **off** "Allow new users to sign up". Leave "Allow anonymous sign-ins" off.
 - [x] (2026-11-26, one user present) Authentication → Users → Add user → Create new user: his email and a strong password he types himself, "Auto confirm user?" ticked.
 - [x] (2026-11-26; Greg could not find the values in the Connect window and asked Claude to fetch them through his Chrome extension: URL from the project address, key from Project Settings → API Keys. `DEPLOY=1 npm run check` passes.) The Project URL and the **Publishable** key go into the file `.env` in this folder. Never a key starting `sb_secret_` or a long one starting `eyJ`.
+- [x] (2026-11-26) First real sign-in works on this Mac (http://localhost:5173, Greg typed his own password, Home screen shown).
 - [ ] After the first deploy: Authentication → URL Configuration → set "Site URL" to the live address and add it under "Redirect URLs" (plus `http://localhost:5173/**` for this Mac). Needed for password-reset links.
 - [ ] **Verify sign-up is really off:** done 2026-11-26 without creating anything: Supabase's own public settings address (`/auth/v1/settings`, called with the publishable key) reports `disable_signup: true` and anonymous sign-ins off. Re-run that check after any change to Auth settings. Still to do: test "Forgot password?" once end to end after the first deploy.
 
