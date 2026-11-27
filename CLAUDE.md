@@ -55,7 +55,7 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 | # | Stage | Status |
 |---|---|---|
 | 1 | Questions, plan and data model | Done 2026-11-26 (Greg approved) |
-| 2 | Accounts and hosting: a live, login-protected app with nothing in it | **In progress.** App built, reviewed and tested on this Mac; first version committed locally. Not online. Waiting on Greg's GitHub, Supabase and Cloudflare accounts (checklist below). |
+| 2 | Accounts and hosting: a live, login-protected app with nothing in it | **In progress.** App built, reviewed and tested on this Mac. GitHub done (code backed up 2026-11-26). Not online. Next: Supabase, then Cloudflare (checklist below). |
 | 3 | Releases, figures, copies; import the starting data; prove the section 10 counts; **switch on the nightly backup** | Not started |
 | 4 | Catalogue, search and tags. Figure page. Collections | Not started |
 | 5 | Listings, listed badge, double-listing warning, "Not listed" view | Not started |
@@ -162,8 +162,8 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 **GitHub** (free; unlimited private repositories)
 - [x] Greg creates the account at github.com/signup and verifies his email. (2026-11-26; username `gregoryrobertsfilm`)
 - [x] Greg creates a **private** repository named `collectables-tracker` at github.com/new (no README, no .gitignore, no license). (2026-11-26)
-- [ ] Claude creates an SSH key on this Mac for this one repository (done 2026-11-26: `~/.ssh/collectables_tracker_deploy`; this repository's git is set to use only that key); Greg pastes the **public** half at repository → Settings → Deploy keys → Add deploy key, with "Allow write access" ticked (**waiting on Greg**). (Chosen over installing the GitHub command-line tool: no download, and the key can reach only this one repository. Trade-off: anything else on GitHub, such as adding a secret, Greg does in the browser.)
-- [ ] Set this repository's git email to Greg's GitHub no-reply address (done 2026-11-26: `361811936+gregoryrobertsfilm@users.noreply.github.com`). Then push to `git@github.com:gregoryrobertsfilm/collectables-tracker.git` (**not pushed yet**).
+- [x] Claude creates an SSH key on this Mac for this one repository (`~/.ssh/collectables_tracker_deploy`; this repository's git is set to use only that key); Greg pastes the **public** half at repository → Settings → Deploy keys → Add deploy key, with "Allow write access" ticked. (2026-11-26) (Chosen over installing the GitHub command-line tool: no download, and the key can reach only this one repository. Trade-off: anything else on GitHub, such as adding a secret, Greg does in the browser.)
+- [x] Set this repository's git email to Greg's GitHub no-reply address (`361811936+gregoryrobertsfilm@users.noreply.github.com`) and push to `git@github.com:gregoryrobertsfilm/collectables-tracker.git`. (First push 2026-11-26.)
 - [ ] Recommended: Greg turns on two-factor authentication (Settings → Password and authentication) and saves the recovery codes.
 
 **Supabase** (free: 500 MB database, 1 GB files, no automatic backups, pauses after about a week without use)
@@ -183,6 +183,10 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 - [ ] First publish: `npm run deploy:live` once (preview addresses only start working after one live deploy), then `npm run deploy:preview` for every later change.
 - [ ] After the first deploy, open `/manifest.webmanifest`, `/version.json` and `/icons/apple-touch-icon.png` on the live address to confirm they are the real files (a missing file would silently return the app page instead of an error).
 - [ ] Greg adds the app to his iPhone home screen: Safari → Share → Add to Home Screen → leave "Open as Web App" on → Add. He signs in once more inside the installed app. (The icon, name and status-bar style are fixed at the moment of adding; changing them later means removing and re-adding the icon, which also signs him out.)
+
+### Uploading to GitHub (pushing)
+
+Claude Code's safety check **refuses to let Claude run `git push`** in this project (it treats sending files to an outside service as sensitive), and Claude must not change its own permission settings. So **Greg runs the upload himself**: give him the single line `cd "/Users/gregoryroberts/Documents/Collectables Business" && git push` in a `bash` code block (he uses the Run button on it) or open a Terminal panel tab in this folder for him to type `git push`. Then confirm with `git status -sb` that local and GitHub match. Commit locally as often as needed, but batch the uploads so he is not asked after every small change: ask at the end of each stage and before anything risky. He found the first request confusing when it was explained in jargon; keep it to "click Run on this line" (2026-11-26).
 
 ### Things to know later
 

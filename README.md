@@ -13,7 +13,7 @@ This page is written for you, Greg, not for a programmer. You never need to edit
 | Thing | Where | Status |
 |---|---|---|
 | The app's code | This folder. Every change is saved as a step that can be undone. | Working on this Mac. |
-| Backup of the code | Your private GitHub repository. | **Not set up yet.** Until then, the only copy is this folder. |
+| Backup of the code | Your private GitHub repository, `gregoryrobertsfilm/collectables-tracker`. | **Set up.** A copy is uploaded at the end of each stage; you run the upload with one click when Claude asks. |
 | Your data | Supabase (the database): figures, copies, listings, sales, purchases. Photos later. | **Not set up yet.** Nothing is stored. |
 | The live app | Cloudflare (the web host). Serves the app to your phone and computer. Holds no data. | **Not set up yet.** |
 | Your starting spreadsheet | `Thrilljoy Starting Data for Claude Code - Greg.xlsx` in this folder. | This is your original. It is **not** sent to GitHub (it contains buyer usernames). Keep your own copy somewhere safe. |
@@ -47,7 +47,7 @@ Undoing a change to how the app looks or behaves does not touch your data. If a 
 
 ## If you get a new computer
 
-This works once the GitHub backup is set up (**not yet**):
+This works now that the GitHub backup is set up:
 
 1. Install Claude Code.
 2. Tell Claude: *"Set up my Collectables Tracker project from GitHub."* It will fetch the code and walk you through signing in to GitHub.
