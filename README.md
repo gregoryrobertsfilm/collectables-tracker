@@ -6,7 +6,7 @@ This page is written for you, Greg, not for a programmer. You never need to edit
 
 ## Status today
 
-**Stage 2 in progress.** The app is built and tested on this Mac. It is **not online yet** and holds **no data yet**. The lines marked "not set up yet" below become true as each account is created.
+**Stage 2 nearly done.** The app is online at **https://collectables-tracker.collectables-tracker.workers.dev** and only you can sign in. It holds **no data yet**; your figures are loaded in stage 3.
 
 ## Where things live
 
@@ -14,13 +14,13 @@ This page is written for you, Greg, not for a programmer. You never need to edit
 |---|---|---|
 | The app's code | This folder. Every change is saved as a step that can be undone. | Working on this Mac. |
 | Backup of the code | Your private GitHub repository, `gregoryrobertsfilm/collectables-tracker`. | **Set up.** A copy is uploaded at the end of each stage; you run the upload with one click when Claude asks. |
-| Your data | Supabase (the database): figures, copies, listings, sales, purchases. Photos later. | **Not set up yet.** Nothing is stored. |
-| The live app | Cloudflare (the web host). Serves the app to your phone and computer. Holds no data. | **Not set up yet.** |
+| Your data | Supabase (the database): figures, copies, listings, sales, purchases. Photos later. | **Set up**, and empty. Only your login exists. |
+| The live app | Cloudflare (the web host). Serves the app to your phone and computer. Holds no data. | **Online** at the address above. |
 | Your starting spreadsheet | `Thrilljoy Starting Data for Claude Code - Greg.xlsx` in this folder. | This is your original. It is **not** sent to GitHub (it contains buyer usernames). Keep your own copy somewhere safe. |
 
 ## Backing up your data
 
-**Today: the database does not exist yet, so there is nothing to back up.** Your only data is the starting spreadsheet in this folder. Keep a copy of this whole folder somewhere safe (iCloud Drive or an external drive).
+**Today: the database is empty, so there is nothing to back up.** Your only data is the starting spreadsheet in this folder. Keep a copy of this whole folder somewhere safe (iCloud Drive or an external drive).
 
 What is planned, and when each part becomes real:
 
@@ -64,6 +64,6 @@ One thing to know about Supabase's free plan: if the app goes unused for about a
 ## Passwords and keys
 
 - Your passwords live in your password manager and nowhere else. Never paste one into a chat.
-- The app's login will be one account: yours. Public sign-up is switched off in Supabase as part of setup (**not done yet**).
+- The app's login is one account: yours. Public sign-up is switched off in Supabase, so nobody else can create one.
 - **Forgot your password?** Tap "Forgot password?" on the sign-in screen. The email link opens in Safari; choose a new password there, then go back to the home-screen app and sign in with it.
 - **Lost your phone?** Sign in on another device, go to Settings, and tap **Sign out everywhere**. Other devices are signed out within the hour. Then, on the sign-in screen, tap "Forgot password?" and set a new one.

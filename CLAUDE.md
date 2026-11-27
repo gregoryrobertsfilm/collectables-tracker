@@ -55,7 +55,7 @@ A private web app that is the single home for Greg's Thrilljoy PIX! figures (and
 | # | Stage | Status |
 |---|---|---|
 | 1 | Questions, plan and data model | Done 2026-11-26 (Greg approved) |
-| 2 | Accounts and hosting: a live, login-protected app with nothing in it | **In progress.** App built, reviewed and tested on this Mac. GitHub done (code backed up 2026-11-26). Not online. Next: Supabase, then Cloudflare (checklist below). |
+| 2 | Accounts and hosting: a live, login-protected app with nothing in it | **Nearly done.** Live at https://collectables-tracker.collectables-tracker.workers.dev since 2026-11-26. Still open: Supabase URL Configuration (for password-reset links), Greg's sign-in on the live address and iPhone home-screen install, one "Forgot password?" test, and uploading the latest notes to GitHub. |
 | 3 | Releases, figures, copies; import the starting data; prove the section 10 counts; **switch on the nightly backup** | Not started |
 | 4 | Catalogue, search and tags. Figure page. Collections | Not started |
 | 5 | Listings, listed badge, double-listing warning, "Not listed" view | Not started |
@@ -178,11 +178,11 @@ Tick each line as it is done and record the date. Greg does every sign-up, passw
 - [ ] **Verify sign-up is really off:** done 2026-11-26 without creating anything: Supabase's own public settings address (`/auth/v1/settings`, called with the publishable key) reports `disable_signup: true` and anonymous sign-ins off. Re-run that check after any change to Auth settings. Still to do: test "Forgot password?" once end to end after the first deploy.
 
 **Cloudflare** (free: static files unlimited; preview addresses included)
-- [ ] Greg signs up at dash.cloudflare.com/sign-up with **email and password** (not Google/Apple/GitHub: those accounts start without a password, which blocks some later steps) and verifies his email. No card is asked for at sign-up.
-- [ ] Greg opens Workers & Pages and checks "Your subdomain": it becomes part of every address (`collectables-tracker.<subdomain>.workers.dev`) and may default to something based on his name or email. Change it before the first deploy if he wants.
-- [ ] Claude runs `npx wrangler login --use-keyring` (stores the sign-in in the Mac's Keychain instead of a plain file); Greg approves in the browser window that opens.
-- [ ] First publish: `npm run deploy:live` once (preview addresses only start working after one live deploy), then `npm run deploy:preview` for every later change.
-- [ ] After the first deploy, open `/manifest.webmanifest`, `/version.json` and `/icons/apple-touch-icon.png` on the live address to confirm they are the real files (a missing file would silently return the app page instead of an error).
+- [x] (2026-11-26) Greg signs up at dash.cloudflare.com/sign-up with **email and password** (not Google/Apple/GitHub: those accounts start without a password, which blocks some later steps) and verifies his email. No card is asked for at sign-up.
+- [x] (2026-11-26) Address name: Greg found this step confusing, so it was skipped. The first publish registered the subdomain `collectables-tracker` automatically, giving the live address **https://collectables-tracker.collectables-tracker.workers.dev** (no personal name in it). It can be changed in the Cloudflare dashboard under Workers & Pages → subdomain, but that changes the address, so only before he relies on it.
+- [x] (2026-11-26) Claude runs `npx wrangler login --use-keyring --device`; Greg approves the short code in his browser (Firefox). **The plain `wrangler login` does not work from Claude's sandbox** (it cannot listen on localhost:8976 for the reply, so the browser shows "Unable to connect"); always use `--device`. The sign-in is stored encrypted with its key in the Mac's Keychain.
+- [x] (2026-11-26) First publish: `npm run deploy:live` once (preview addresses only start working after one live deploy), then `npm run deploy:preview` for every later change. A brand-new address took about a minute before its security certificate worked.
+- [x] (2026-11-26; all real files, security headers present, sign-in screen loads with no errors and can reach Supabase) After each deploy, open `/manifest.webmanifest`, `/version.json` and `/icons/apple-touch-icon.png` on the live address to confirm they are the real files (a missing file would silently return the app page instead of an error). When checking with `curl`, send a browser-style User-Agent: Cloudflare blocks default script User-Agents on workers.dev.
 - [ ] Greg adds the app to his iPhone home screen: Safari → Share → Add to Home Screen → leave "Open as Web App" on → Add. He signs in once more inside the installed app. (The icon, name and status-bar style are fixed at the moment of adding; changing them later means removing and re-adding the icon, which also signs him out.)
 
 ### Uploading to GitHub (pushing)
@@ -203,3 +203,4 @@ Claude Code's safety check **refuses to let Claude run `git push`** in this proj
 |---|---|
 | 2026-11-26 | Stage 1: read brief and spreadsheet, verified every section 10 number, checked hosting terms and prices, Greg chose Cloudflare + Supabase, plan approved. |
 | 2026-11-26 | Stage 2 (part 1): project created; login screen, password reset, empty Home and Settings (sign out here / everywhere), new-version notice, iPhone home-screen install files and icons, security headers, build-time settings guard, money maths library. 60 automated tests. Setup steps researched and fact-checked against today's official docs. Independent review (security, correctness, iPhone use, match to brief) run and its confirmed findings fixed. First commit made locally. Not yet online: waiting on Greg's accounts. |
+| 2026-11-26 | Stage 2 (part 2): GitHub repository created and code uploaded; Supabase project created, sign-up off, one user, app connected; Cloudflare account created and the app published for the first time. Live address works and shows only the sign-in screen. |
